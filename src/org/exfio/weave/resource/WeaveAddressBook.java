@@ -10,16 +10,14 @@
  ******************************************************************************/
 package org.exfio.weave.resource;
 
-import at.bitfire.davdroid.resource.Resource;
-import at.bitfire.davdroid.resource.Contact;
-
+import org.exfio.weave.resource.Resource;
+import org.exfio.weave.resource.Contact;
+//import org.exfio.weave.client.WeaveBasicObject;
 import org.exfio.weave.client.WeaveClient;
-import org.exfio.weave.Constants;
 import org.exfio.weave.WeaveException;
 
 
 public class WeaveAddressBook extends WeaveCollection<Contact> {
-	private final static String TAG = "exfio.WeaveAddressBook";
 	
 	public WeaveAddressBook(WeaveClient weaveClient, String collection) {
 		super(weaveClient, collection);
@@ -38,7 +36,7 @@ public class WeaveAddressBook extends WeaveCollection<Contact> {
 
 	public Contact get(String id) throws WeaveException {
 		//GET storage/collection/id
-		WeaveBasicObject wbo = this.weaveClient.get(this.collection, id);		
+		//WeaveBasicObject wbo = this.weaveClient.getItem(this.collection, id);		
 		
 		//TODO - parse jcard
 		return new Contact("foo", "bar");

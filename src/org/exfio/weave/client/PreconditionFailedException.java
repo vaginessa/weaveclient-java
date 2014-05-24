@@ -8,24 +8,15 @@
  * Contributors:
  *     Richard Hirner (bitfire web engineering) - initial API and implementation
  ******************************************************************************/
-package org.exfio.weave.syncadaptor;
+package org.exfio.weave.client;
 
-import android.app.Activity;
-import android.os.Bundle;
-import at.bitfire.davdroid.R;
+import org.apache.http.HttpStatus;
+import org.exfio.weave.net.HttpException;
 
-public class AddAccountActivity extends Activity {
-
-	@Override
-	protected void onCreate(Bundle savedInstanceState) {
-		super.onCreate(savedInstanceState);
-		
-		setContentView(R.layout.add_account);
-		
-		if (savedInstanceState == null) {	// first call
-			getFragmentManager().beginTransaction()
-				.add(R.id.fragment_container, new EnterCredentialsFragment(), "exfio_enter_credentials")
-				.commit();
-		}
+public class PreconditionFailedException extends HttpException {
+	private static final long serialVersionUID = 102282229174086113L;
+	
+	public PreconditionFailedException(String reason) {
+		super(HttpStatus.SC_PRECONDITION_FAILED, reason);
 	}
 }

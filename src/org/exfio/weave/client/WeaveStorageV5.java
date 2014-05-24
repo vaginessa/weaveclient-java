@@ -1,14 +1,11 @@
 package org.exfio.weave.client;
 
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.io.UnsupportedEncodingException;
+import java.security.SecureRandom;
 
-import android.util.Log;
-
+import org.exfio.weave.Log;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.codec.binary.Base32;
 import org.apache.commons.codec.binary.Hex;
@@ -34,43 +31,21 @@ import java.security.InvalidKeyException;
 import org.exfio.weave.Constants;
 import org.exfio.weave.WeaveException;
 import org.exfio.weave.client.WeaveClientParams;
-import org.exfio.weave.resource.WeaveBasicObject;
 
 public class WeaveStorageV5 extends WeaveStorageContext {
-	private static final String TAG = "exfio.WeaveStorageContextV5";
 	
-	private WeaveHttpClient httpClient;
+	private WeaveApiClient weaveApiClient;
 	private String user;
 	private String syncKey;
 	private WeaveKeyPair privateKey;
 	private Map<String, WeaveKeyPair> bulkKeys;
 
 	public WeaveStorageV5() {
-		this.httpClient = null;
-		this.user        = null;
-		this.syncKey     = null;
-		this.privateKey  = null;
-		this.bulkKeys    = null;
-	}
-
-	public WeaveStorageV5(String baseURL, String user, String password, String syncKey) throws WeaveException {
-		init(baseURL, user, password, syncKey);
-	}
-
-	public void init(String baseURL, String user, String password, String syncKey) throws WeaveException {
-		this.httpClient  = new WeaveHttpClient(baseURL, user, password);
-		this.user        = user;
-		this.syncKey     = syncKey;
-		this.privateKey  = null;
-		this.bulkKeys    = null;
-	}
-
-	public void init(WeaveHttpClient httpClient, String user, String syncKey) throws WeaveException {
-		this.httpClient  = httpClient;
-		this.user        = user;
-		this.syncKey     = syncKey;
-		this.privateKey  = null;
-		this.bulkKeys    = null;
+		this.weaveApiClient = null;
+		this.user           = null;
+		this.syncKey        = null;
+		this.privateKey     = null;
+		this.bulkKeys       = null;
 	}
 
 	public void init(WeaveClientParams params) throws WeaveException {
@@ -78,8 +53,25 @@ public class WeaveStorageV5 extends WeaveStorageContext {
 		init(p.baseURL, p.user, p.password, p.syncKey);
 	}
 
-	public WeaveHttpClient getHttpClient() {
-		return httpClient;
+	public void init(String baseURL, String user, String password, String syncKey) throws WeaveException {
+		init(baseURL, user, password, syncKey, WeaveClient.ApiVersion.v1_1);
+	}
+
+	public void init(String baseURL, String user, String password, String syncKey, WeaveClient.ApiVersion apiVersion) throws WeaveException {
+		this.weaveApiClient = WeaveApiClient.getApiClient(apiVersion);
+		this.weaveApiClient.init(baseURL, user, password);
+		this.user            = user;
+		this.syncKey         = syncKey;
+		this.privateKey      = null;
+		this.bulkKeys        = null;
+	}
+
+	public WeaveApiClient getApiClient() {
+		return weaveApiClient;
+	}
+	
+	public void setApiClient(WeaveApiClient weaveApiClient) {
+		this.weaveApiClient = weaveApiClient;
 	}
 	
 	/**
@@ -88,8 +80,8 @@ public class WeaveStorageV5 extends WeaveStorageContext {
      by using my passphrase.  Store the private key in internal
      storage for later use.
 	 */
-	private WeaveKeyPair getPrivateKeyPair() {
-		Log.i(TAG, "getPrivateKeyPair()");
+	private WeaveKeyPair getPrivateKeyPair() throws NoSuchAlgorithmException, InvalidKeyException {
+		Log.getInstance().debug("getPrivateKeyPair()");
 
 		if ( this.privateKey == null ) {
 
@@ -102,7 +94,7 @@ public class WeaveStorageV5 extends WeaveStorageContext {
 											.replace('9', 'O')
 											.replaceAll("-", "");
 
-			Log.d(TAG, String.format("normalised sync key: %s",  syncKeyB32));
+			Log.getInstance().debug( String.format("normalised sync key: %s",  syncKeyB32));
 
 			// Pad base32 string to multiple of 8 chars (40 bits)
 			if ( (syncKeyB32.length() % 8) > 0 ) {
@@ -119,29 +111,23 @@ public class WeaveStorageV5 extends WeaveStorageContext {
 			//syncKey = binascii.unhexlify("c71aa7cbd8b82a8ff6eda55c39479fd2")
 			//keyInfo = "Sync-AES_256_CBC-HMAC256" + "johndoe@example.com"
 
-			Log.d(TAG, String.format("base32 key: %s decoded to %s", this.syncKey, Hex.encodeHexString(syncKeyBin)));
+			Log.getInstance().debug( String.format("base32 key: %s decoded to %s", this.syncKey, Hex.encodeHexString(syncKeyBin)));
 
 			WeaveKeyPair keyPair = new WeaveKeyPair();
 
-			try {
-				byte[] message;
-				Mac hmacSHA256 = Mac.getInstance("HmacSHA256");
-				hmacSHA256.init(new SecretKeySpec(syncKeyBin, "HmacSHA256"));
-				message = ArrayUtils.addAll(keyInfo.getBytes(Constants.ASCII), new byte[]{1});
-				keyPair.cryptKey = hmacSHA256.doFinal(message);
-				message = ArrayUtils.addAll(ArrayUtils.addAll(keyPair.cryptKey, keyInfo.getBytes(Constants.ASCII)) , new byte[]{2});
-				keyPair.hmacKey  = hmacSHA256.doFinal(message);
-
-			} catch (NoSuchAlgorithmException e) {
-				//TODO - Handle error
-			} catch (InvalidKeyException e) {
-				//TODO - Handle error				
-			}
+			byte[] message;
+			Mac hmacSHA256 = Mac.getInstance("HmacSHA256");
+			hmacSHA256.init(new SecretKeySpec(syncKeyBin, "HmacSHA256"));
+			
+			message = ArrayUtils.addAll(keyInfo.getBytes(Constants.ASCII), new byte[]{1});
+			keyPair.cryptKey = hmacSHA256.doFinal(message);
+			message = ArrayUtils.addAll(ArrayUtils.addAll(keyPair.cryptKey, keyInfo.getBytes(Constants.ASCII)) , new byte[]{2});
+			keyPair.hmacKey  = hmacSHA256.doFinal(message);
 			
 			this.privateKey = keyPair;
 			
-			Log.i(TAG, "Successfully generated sync key and hmac key");
-			Log.d(TAG, String.format("sync key: %s, crypt key: %s, crypt hmac: %s", this.syncKey, Hex.encodeHexString(keyPair.cryptKey), Hex.encodeHexString(keyPair.hmacKey)));
+			Log.getInstance().info( "Successfully generated sync key and hmac key");
+			Log.getInstance().debug( String.format("sync key: %s, crypt key: %s, crypt hmac: %s", this.syncKey, Hex.encodeHexString(keyPair.cryptKey), Hex.encodeHexString(keyPair.hmacKey)));
 		}
 		return this.privateKey;
 	}
@@ -152,12 +138,12 @@ public class WeaveStorageV5 extends WeaveStorageContext {
       into self storage for later decrypt operations."""
 	 */
 	private WeaveKeyPair getBulkKeyPair(String collection) throws WeaveException {
-		Log.i(TAG, "getBulkKeyPair()");
+		Log.getInstance().debug("getBulkKeyPair()");
 		
 		if ( this.bulkKeys == null ) {
-			Log.i(TAG, "Fetching bulk keys from server");
+			Log.getInstance().info( "Fetching bulk keys from server");
 
-            WeaveBasicObject res = httpClient.get("crypto/keys");
+            WeaveBasicObject res = weaveApiClient.get("crypto/keys");
 
             // Recursively call decrypt to extract key data
             String payload = this.decrypt(res.getPayload(), null);
@@ -174,24 +160,35 @@ public class WeaveStorageV5 extends WeaveStorageContext {
 
     		this.bulkKeys   = new HashMap<String, WeaveKeyPair>();
 
-    	    Iterator it = keyData.entrySet().iterator();
+    		//Get default key pair
+    		JSONArray defaultKey = (JSONArray)keyData.get("default");
+    		
+        	WeaveKeyPair keyPair = new WeaveKeyPair();
+        	keyPair.cryptKey = Base64.decodeBase64((String)defaultKey.get(0));
+        	keyPair.hmacKey  = Base64.decodeBase64((String)defaultKey.get(1));
+            this.bulkKeys.put("default", keyPair);
+    		
+            //Get collection key pairs
+            JSONObject colKeys = (JSONObject)keyData.get("collections");
+            
+    	    Iterator<?> it = colKeys.entrySet().iterator();
     	    while (it.hasNext()) {
-    	        Map.Entry pairs = (Map.Entry)it.next();
+    	        Map.Entry<?, ?> pairs = (Map.Entry<?, ?>)it.next();
             	JSONArray bulkKey = (JSONArray)pairs.getValue();
             	
-            	WeaveKeyPair keyPair = new WeaveKeyPair();
-            	keyPair.cryptKey = Base64.decodeBase64((String)bulkKey.get(0));
-            	keyPair.hmacKey  = Base64.decodeBase64((String)bulkKey.get(1));
-                this.bulkKeys.put((String)pairs.getKey(), keyPair);
+            	WeaveKeyPair bulkKeyPair = new WeaveKeyPair();
+            	bulkKeyPair.cryptKey = Base64.decodeBase64((String)bulkKey.get(0));
+            	bulkKeyPair.hmacKey  = Base64.decodeBase64((String)bulkKey.get(1));
+                this.bulkKeys.put((String)pairs.getKey(), bulkKeyPair);
             }
             
-            Log.i(TAG, String.format("Successfully decrypted bulk key for %s", collection));
+            Log.getInstance().info( String.format("Successfully decrypted bulk key for %s", collection));
 		}
 
         if ( this.bulkKeys.containsKey(collection) )  {
         	return this.bulkKeys.get(collection);
         } else if ( this.bulkKeys.containsKey("default") ) {
-        	Log.i(TAG, String.format("No key found for %s, using default", collection));
+        	Log.getInstance().info( String.format("No key found for %s, using default", collection));
         	return this.bulkKeys.get("default");        	
         } else {
         	throw new WeaveException("No default key found");
@@ -199,17 +196,15 @@ public class WeaveStorageV5 extends WeaveStorageContext {
 	}
 	
 	public WeaveBasicObject decryptWeaveBasicObject(WeaveBasicObject wbo, String collection) throws WeaveException {
-		String payload         = decrypt(wbo.getPayload(), collection);
-		JSONObject jsonPayload = null;
-
 		try {
-			JSONParser parser = new JSONParser();
-			jsonPayload = (JSONObject)parser.parse(payload);  
+			if ( !isEncrypted(wbo) ) {
+				throw new WeaveException("Weave Basic Object already decrypted");
+			}
 		} catch (ParseException e) {
 			throw new WeaveException(e);
 		}
-		
-		return new WeaveBasicObject(wbo.getId(), wbo.getModified(), wbo.getSortindex(), wbo.getTtl(), payload, jsonPayload);
+		String payload = decrypt(wbo.getPayload(), collection);
+		return new WeaveBasicObject(wbo.getId(), wbo.getModified(), wbo.getSortindex(), wbo.getTtl(), payload);
 	}
 	
 	public String decrypt(String payload, String collection) throws WeaveException {
@@ -233,17 +228,23 @@ public class WeaveStorageV5 extends WeaveStorageContext {
         WeaveKeyPair keyPair = null;
         
         if ( collection == null ) {
-        	Log.i(TAG,"Decrypting data record using sync key");
+        	Log.getInstance().info("Decrypting data record using sync key");
         	
-        	keyPair = this.getPrivateKeyPair();
+        	try {
+        		keyPair = this.getPrivateKeyPair();
+        	} catch(NoSuchAlgorithmException e) { 
+        		throw new WeaveException(e);
+        	} catch(InvalidKeyException e) {
+        		throw new WeaveException(e);
+        	}
         		
         } else {
-        	Log.i(TAG, String.format("Decrypting data record using bulk key %s", collection));
+        	Log.getInstance().info(String.format("Decrypting data record using bulk key %s", collection));
 
         	keyPair = this.getBulkKeyPair(collection);
         }
             
-        Log.d(TAG, String.format("payload: %s, crypt key:  %s, crypt hmac: %s", payload, Hex.encodeHexString(keyPair.cryptKey), Hex.encodeHexString(keyPair.hmacKey)));
+        Log.getInstance().debug( String.format("payload: %s, crypt key:  %s, crypt hmac: %s", payload, Hex.encodeHexString(keyPair.cryptKey), Hex.encodeHexString(keyPair.hmacKey)));
             
             
         // 1. Validate hmac of ciphertext
@@ -260,7 +261,8 @@ public class WeaveStorageV5 extends WeaveStorageContext {
 			throw new WeaveException(e);
 		}
         
-        if ( local_hmac != cipher_hmac ) {
+        if ( !local_hmac.equals(cipher_hmac) ) {
+        	Log.getInstance().warn(String.format("cipher hmac: %s, local hmac: %s", cipher_hmac, local_hmac));
         	throw new WeaveException("HMAC verification failed!");
         }
             
@@ -268,13 +270,15 @@ public class WeaveStorageV5 extends WeaveStorageContext {
         // Note: this is the same as this operation at the openssl command line:
         // openssl enc -d -in data -aes-256-cbc -K `cat unwrapped_symkey.16` -iv `cat iv.16`
         try {
-        	Cipher cipher = Cipher.getInstance("AES/CBC/NOPADDING");
+        	Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
         	cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(keyPair.cryptKey, "AES"), new IvParameterSpec(iv));
         	
         	byte[] clearbytes = cipher.doFinal(cipherbytes);
         	cleartext = new String(clearbytes, Constants.UTF8);
         	
-		} catch (NoSuchAlgorithmException e) {
+            Log.getInstance().debug(String.format("cleartext: %s", cleartext));
+
+        } catch (NoSuchAlgorithmException e) {
 			throw new WeaveException(e);
 		} catch (InvalidAlgorithmParameterException e) {
 			throw new WeaveException(e);
@@ -287,10 +291,22 @@ public class WeaveStorageV5 extends WeaveStorageContext {
 		} catch (InvalidKeyException e) {
 			throw new WeaveException(e);
         }
-        		
-        Log.i(TAG, "Successfully decrypted v5 data record");
+
+        Log.getInstance().info("Successfully decrypted v5 data record");
         
 		return cleartext;
+	}
+
+	public WeaveBasicObject encryptWeaveBasicObject(WeaveBasicObject wbo, String collection) throws WeaveException {
+		try {
+			if ( isEncrypted(wbo) ) {
+				throw new WeaveException("Weave Basic Object already encrypted");
+			}
+		} catch (ParseException e) {
+			throw new WeaveException(e);
+		}
+		String payload = encrypt(wbo.getPayload(), collection);
+		return new WeaveBasicObject(wbo.getId(), wbo.getModified(), wbo.getSortindex(), wbo.getTtl(), payload);
 	}
 
 	/**
@@ -298,25 +314,32 @@ public class WeaveStorageV5 extends WeaveStorageContext {
 	 *
 	 * Given a plaintext object, encrypt it and return the ciphertext value.
 	 */
+	@SuppressWarnings("unchecked")
 	public String encrypt(String plaintext, String collection) throws WeaveException {		
-		Log.d(TAG, "encrypt()");
-		Log.d(TAG, "plaintext:\n" + plaintext);
+		Log.getInstance().debug( "encrypt()");
+		Log.getInstance().debug( "plaintext:\n" + plaintext);
 	        
 
 		WeaveKeyPair keyPair = null;
 		
 		if ( collection == null ) {
-			Log.i(TAG, "Encrypting data record using sync key");
+			Log.getInstance().info( "Encrypting data record using sync key");
 
-			keyPair = this.getPrivateKeyPair();
+        	try {
+        		keyPair = this.getPrivateKeyPair();
+        	} catch(NoSuchAlgorithmException e) { 
+        		throw new WeaveException(e);
+        	} catch(InvalidKeyException e) {
+        		throw new WeaveException(e);
+        	}
 	                
 		} else {
-			Log.i(TAG, String.format("Encrypting data record using bulk key %s", collection));
+			Log.getInstance().info( String.format("Encrypting data record using bulk key %s", collection));
 
 			keyPair = this.getBulkKeyPair(collection);
 		}
 		
-        Log.d(TAG, String.format("payload: %s, crypt key:  %s, crypt hmac: %s", plaintext, Hex.encodeHexString(keyPair.cryptKey), Hex.encodeHexString(keyPair.hmacKey)));
+        Log.getInstance().debug( String.format("payload: %s, crypt key:  %s, crypt hmac: %s", plaintext, Hex.encodeHexString(keyPair.cryptKey), Hex.encodeHexString(keyPair.hmacKey)));
 		
         
 		// Encryption primitives
@@ -325,14 +348,16 @@ public class WeaveStorageV5 extends WeaveStorageContext {
         byte[] iv          = null;
         byte[] hmac        = null;
         
-		
         // 1. Encrypt plaintext
         // Note: this is the same as this operation at the openssl command line:
         // openssl enc -d -in data -aes-256-cbc -K `cat unwrapped_symkey.16` -iv `cat iv.16`
 		
         try {
-        	Cipher cipher = Cipher.getInstance("AES/CBC/NOPADDING");
-        	cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(keyPair.cryptKey, "AES"), new IvParameterSpec(iv));
+            SecureRandom rnd = new SecureRandom();
+            IvParameterSpec ivspec = new IvParameterSpec(rnd.generateSeed(16));
+            
+        	Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        	cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(keyPair.cryptKey, "AES"), ivspec);
         	cipherbytes = cipher.doFinal(plaintext.getBytes(Constants.ASCII));
         	iv          = cipher.getIV();
         	
@@ -364,7 +389,7 @@ public class WeaveStorageV5 extends WeaveStorageContext {
 			throw new WeaveException(e);
 		}
 
-		Log.i(TAG, "Successfully encrypted v5 data record");
+		Log.getInstance().info( "Successfully encrypted v5 data record");
 
         // Construct JSON encoded payload
 		JSONObject encryptObject = new JSONObject();
@@ -376,8 +401,41 @@ public class WeaveStorageV5 extends WeaveStorageContext {
 		return encryptObject.toJSONString();
 	}
 	
-	public WeaveBasicObject get(String collection, String id) throws WeaveException {
-		WeaveBasicObject wbo = this.httpClient.get(collection, id);
-		return this.decryptWeaveBasicObject(wbo, collection);
+	public boolean isEncrypted(WeaveBasicObject wbo) throws ParseException {
+		//Determine if WBO is encrypted or not
+		JSONObject jsonPayload = wbo.getPayloadAsJSONObject();
+		return ( jsonPayload.containsKey("ciphertext") && jsonPayload.containsKey("IV") && jsonPayload.containsKey("hmac") );
 	}
+	
+	public WeaveBasicObject get(String collection, String id, boolean decrypt) throws WeaveException {
+		WeaveBasicObject wbo = this.weaveApiClient.get(collection, id);
+		if ( decrypt ) {
+			try {
+				if ( isEncrypted(wbo) ) {
+					wbo = decryptWeaveBasicObject(wbo, collection);
+				} else {
+					throw new WeaveException("Weave Basic Object payload not encrypted");
+				}
+			} catch (ParseException e) {
+				throw new WeaveException(e);
+			}
+		}
+		return wbo;
+	}
+
+	public Double put(String collection, String id, WeaveBasicObject wbo, boolean encrypt) throws WeaveException {
+		if ( encrypt ) {
+			try {
+				if ( !isEncrypted(wbo) ) {
+					wbo = encryptWeaveBasicObject(wbo, collection);
+				} else {
+					throw new WeaveException("Weave Basic Object payload already encrypted");
+				}
+			} catch (ParseException e) {
+				throw new WeaveException(e);
+			}
+		}
+		return this.weaveApiClient.put(collection, id, wbo);
+	}
+	
 }

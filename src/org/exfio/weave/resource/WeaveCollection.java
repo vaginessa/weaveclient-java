@@ -10,28 +10,14 @@
  ******************************************************************************/
 package org.exfio.weave.resource;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.util.LinkedList;
 import java.util.List;
 
-import lombok.Cleanup;
-import lombok.Getter;
-import ch.boye.httpclientandroidlib.impl.client.CloseableHttpClient;
-import android.util.Log;
-import at.bitfire.davdroid.resource.InvalidResourceException;
-import at.bitfire.davdroid.resource.RemoteResourceException;
-import at.bitfire.davdroid.resource.Resource;
-import at.bitfire.davdroid.webdav.HttpException;
-
+import org.exfio.weave.resource.Resource;
 import org.exfio.weave.WeaveException;
+import org.exfio.weave.client.WeaveBasicObject;
 import org.exfio.weave.client.WeaveClient;
 
 public abstract class WeaveCollection<T extends Resource> {
-	private final static String TAG = "exfio.WeaveCollection"; 
 
 	protected WeaveClient weaveClient;
 	protected String collection;
