@@ -437,5 +437,9 @@ public class WeaveStorageV5 extends WeaveStorageContext {
 		}
 		return this.weaveApiClient.put(collection, id, wbo);
 	}
-	
+
+	public void delete(String collection, String id) throws WeaveException {
+		this.weaveApiClient.delete(collection, id);
+	}
+
 }

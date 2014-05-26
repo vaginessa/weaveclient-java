@@ -21,4 +21,6 @@ public abstract class WeaveStorageContext {
 	public abstract Double put(String collection, String id, WeaveBasicObject wbo, boolean encrypt) throws WeaveException;
 
 	public Double put(String collection, String id, WeaveBasicObject wbo) throws WeaveException { return put(collection, id, wbo, true); }
+
+	public abstract void delete(String collection, String id) throws WeaveException;
 }

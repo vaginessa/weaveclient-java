@@ -48,6 +48,10 @@ public abstract class WeaveApiClient {
 
 	public abstract Double put(URI location, WeaveBasicObject wbo) throws WeaveException;
 
+	public abstract void delete(String collection, String id) throws WeaveException;
+	
+	public abstract void delete(URI location) throws WeaveException;
+
 	public void lock() {
 		httpClient.lock();
 	}

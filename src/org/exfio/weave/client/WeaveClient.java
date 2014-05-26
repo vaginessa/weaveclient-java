@@ -73,6 +73,10 @@ public class WeaveClient {
 		return ws.put(collection, id, wbo);
 	}
 
+	public void deleteItem(String collection, String id) throws WeaveException {
+		ws.delete(collection, id);
+	}
+
 	public void lock() {
 		ws.getApiClient().lock();
 	}
@@ -105,6 +109,7 @@ public class WeaveClient {
 		String collection = null;
 		String id         = null;
 		String payload    = null;
+		boolean delete    = false;
 		String loglevel   = null;
 		
 		WeaveClient.StorageVersion storageVersion = null;
@@ -126,7 +131,8 @@ public class WeaveClient {
 		options.addOption("k", "sync-key", true, "sync key (required for storage v5)");
 		options.addOption("c", "collection", true, "collection");
 		options.addOption("i", "id", true, "object ID");
-		options.addOption("m", "modify", true, "update collection, or single item, with given value in JSON format. Requires -c and optionally -i");
+		options.addOption("m", "modify", true, "update item with given value in JSON format. Requires -c and -i");
+		options.addOption("d", "delete", false, "delete item. Requires -c and -i");
 		options.addOption("l", "log-level", true, "set log level (trace|debug|info|warn|error)");
 		
 		CommandLineParser parser = new GnuParser();
@@ -192,10 +198,21 @@ public class WeaveClient {
 
 		if ( cmd.hasOption('m') ) {
 			if ( id == null ) {
-				System.err.println("id is required using the modify option");
+				System.err.println("id is required when using the modify option");
 				System.exit(1);
 			}
 			payload = cmd.getOptionValue('m');
+		}
+
+		if ( cmd.hasOption('d') ) {
+			if ( id == null ) {
+				System.err.println("id is required when using the delete option");
+				System.exit(1);
+			} else if ( payload != null ) {
+				System.err.println("the modify and delete options cannot be used together");
+				System.exit(1);
+			}
+			delete = true;
 		}
 
 		//Need to set log level BEFORE instansiating Logger
@@ -245,6 +262,17 @@ public class WeaveClient {
 				System.exit(1);
 			}
 			System.out.println(String.format("modified: %f", modified));
+
+		} else if ( delete ) {
+			
+			try {
+				weaveClient.deleteItem(collection, id);
+			} catch(WeaveException e) {
+				System.err.println(e.getMessage());
+				System.exit(1);
+			}
+
+			//TODO - Handle collections
 
 		} else {
 			

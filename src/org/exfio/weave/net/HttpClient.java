@@ -22,6 +22,7 @@ import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPut;
+import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.protocol.HttpClientContext;
 import org.apache.http.config.Registry;
 import org.apache.http.config.RegistryBuilder;
@@ -185,4 +186,22 @@ public class HttpClient {
 		return entityResponse;
 	}
 
+	public HttpEntity delete(URI location) throws IOException, HttpException {
+
+		HttpDelete del = new HttpDelete(location);
+		CloseableHttpResponse response = null;
+		HttpEntity entity = null;
+		
+		//parse request content to extract JSON encoded WeaveBasicObject
+		try {
+			response = httpClient.execute(del, context);
+			checkResponse(response);
+			entity = response.getEntity();
+		} finally {
+			if ( response != null )
+				closeResponse(response);
+		}
+		
+		return entity;
+	}
 }

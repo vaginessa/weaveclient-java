@@ -183,4 +183,29 @@ public class WeaveApiClientV1_1 extends WeaveApiClient {
 		
 		return modified;
 	}
+
+	public void delete(String collection, String id) throws WeaveException {
+		URI location = null;
+		if (id == null) {
+			location = this.storageURL.resolve(URIUtils.sanitize(String.format("/1.1/%s/storage/%s", this.user, collection)));
+		} else {
+			location = this.storageURL.resolve(URIUtils.sanitize(String.format("/1.1/%s/storage/%s/%s", this.user, collection, id)));			
+		}
+		this.delete(location);
+	}
+	
+	public void delete(URI location) throws WeaveException {
+		Log.getInstance().debug( "get()");
+		
+		try {
+
+			HttpEntity entity = httpClient.delete(location);
+
+		} catch (IOException e) {
+			throw new WeaveException(e);
+		} catch (HttpException e) {
+			throw new WeaveException(e);
+		}	
+	}
+
 }
