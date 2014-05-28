@@ -44,6 +44,10 @@ public abstract class WeaveApiClient {
 
 	public abstract WeaveBasicObject get(URI location) throws WeaveException;
 
+	public abstract WeaveBasicObject[] getCollection(String collection, String[] ids, Double older, Double newer, Integer index_above, Integer index_below, Integer limit, Integer offset, String sort, String format) throws WeaveException;
+
+	public abstract WeaveBasicObject[] getCollection(URI location) throws WeaveException;
+
 	public abstract Double put(String collection, String id, WeaveBasicObject wbo) throws WeaveException;
 
 	public abstract Double put(URI location, WeaveBasicObject wbo) throws WeaveException;

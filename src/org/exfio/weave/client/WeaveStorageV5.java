@@ -423,6 +423,24 @@ public class WeaveStorageV5 extends WeaveStorageContext {
 		return wbo;
 	}
 
+	public WeaveBasicObject[] getCollection(String collection, String[] ids, Double older, Double newer, Integer index_above, Integer index_below, Integer limit, Integer offset, String sort, String format, boolean decrypt) throws WeaveException {
+		WeaveBasicObject[] colWbo = this.weaveApiClient.getCollection(collection, ids, older, newer, index_above, index_below, limit, offset, sort, format);
+		if ( decrypt ) {
+			try {
+				for (int i = 0; i < colWbo.length; i++) {
+					if ( isEncrypted(colWbo[i]) ) {
+						colWbo[i] = decryptWeaveBasicObject(colWbo[i], collection);
+					} else {
+						throw new WeaveException("Weave Basic Object payload not encrypted");
+					}
+				}
+			} catch (ParseException e) {
+				throw new WeaveException(e);
+			}
+		}
+		return colWbo;
+	}
+	
 	public Double put(String collection, String id, WeaveBasicObject wbo, boolean encrypt) throws WeaveException {
 		if ( encrypt ) {
 			try {

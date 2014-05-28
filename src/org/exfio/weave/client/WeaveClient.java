@@ -65,8 +65,8 @@ public class WeaveClient {
 	public WeaveBasicObject getItem(String collection, String id) throws WeaveException {
 		return ws.get(collection, id);
 	}
-	public WeaveBasicObject getCollection(String collection) throws WeaveException {
-		return ws.get(collection, null);
+	public WeaveBasicObject[] getCollection(String collection, String[] ids, Double older, Double newer, Integer index_above, Integer index_below, Integer limit, Integer offset, String sort, String format) throws WeaveException {
+		return ws.getCollection(collection, ids, older, newer, index_above, index_below, limit, offset, sort, format);
 	}
 
 	public Double putItem(String collection, String id, WeaveBasicObject wbo) throws WeaveException {
@@ -276,20 +276,20 @@ public class WeaveClient {
 
 		} else {
 			
-			WeaveBasicObject wbo = null;
 			try {
 				if ( id != null ) {
-					wbo = weaveClient.getItem(collection, id);
+					WeaveBasicObject wbo = weaveClient.getItem(collection, id);
+					System.out.print(wbo.getPayload());
 				} else {
-					wbo = weaveClient.getCollection(collection);
+					WeaveBasicObject[] colWbo = weaveClient.getCollection(collection, null, null, null, null, null, null, null, null, null);
+					for (int i = 0; i < colWbo.length; i++) {
+						System.out.println(colWbo[i].getPayload().trim());
+					}	
 				}
 			} catch(WeaveException e) {
 				System.err.println(e.getMessage());
 				System.exit(1);
 			}
-
-			//TODO - Handle collections
-			System.out.print(wbo.getPayload());
 		}
 	}
 }
