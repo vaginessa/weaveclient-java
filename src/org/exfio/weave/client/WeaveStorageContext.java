@@ -18,11 +18,17 @@ public abstract class WeaveStorageContext {
 	
 	public WeaveBasicObject get(String collection, String id) throws WeaveException { return get(collection, id, true); }
 
+	public abstract String[] getCollectionIds(String collection, String[] ids, Double older, Double newer, Integer index_above, Integer index_below, Integer limit, Integer offset, String sort) throws WeaveException;
+
 	public abstract WeaveBasicObject[] getCollection(String collection, String[] ids, Double older, Double newer, Integer index_above, Integer index_below, Integer limit, Integer offset, String sort, String format, boolean decrypt) throws WeaveException;
 
 	public WeaveBasicObject[] getCollection(String collection, String[] ids, Double older, Double newer, Integer index_above, Integer index_below, Integer limit, Integer offset, String sort, String format) throws WeaveException {
 		return getCollection(collection, ids, older, newer, index_above, index_below, limit, offset, sort, format, true);
 	}
+
+	public abstract WeaveCollectionInfo getCollectionInfo(String collection, boolean getcount, boolean getusage) throws WeaveException;
+
+	public WeaveCollectionInfo getCollectionInfo(String collection) throws WeaveException { return getCollectionInfo(collection, false, false); }
 
 	public abstract Double put(String collection, String id, WeaveBasicObject wbo, boolean encrypt) throws WeaveException;
 

@@ -12,8 +12,8 @@ import org.json.simple.parser.ParseException;
 public class WeaveBasicObject {
 	@Getter protected String id;
 	@Getter protected Double modified;
-	@Getter protected Integer sortindex;
-	@Getter protected Integer ttl;
+	@Getter protected Long sortindex;
+	@Getter protected Long ttl;
 	@Getter protected String payload;
 	
 	protected JSONObject jsonPayload;
@@ -22,7 +22,7 @@ public class WeaveBasicObject {
 		this.id = id;
 	}
 
-	public WeaveBasicObject(String id, Double modified, Integer sortindex, Integer ttl, String payload) {
+	public WeaveBasicObject(String id, Double modified, Long sortindex, Long ttl, String payload) {
 		this.id          = id;
 		this.modified    = modified;
 		this.sortindex   = sortindex;

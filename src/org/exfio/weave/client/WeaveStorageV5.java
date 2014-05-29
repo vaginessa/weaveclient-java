@@ -423,6 +423,10 @@ public class WeaveStorageV5 extends WeaveStorageContext {
 		return wbo;
 	}
 
+	public String[] getCollectionIds(String collection, String[] ids, Double older, Double newer, Integer index_above, Integer index_below, Integer limit, Integer offset, String sort) throws WeaveException {
+		return this.weaveApiClient.getCollectionIds(collection, ids, older, newer, index_above, index_below, limit, offset, sort);
+	}
+
 	public WeaveBasicObject[] getCollection(String collection, String[] ids, Double older, Double newer, Integer index_above, Integer index_below, Integer limit, Integer offset, String sort, String format, boolean decrypt) throws WeaveException {
 		WeaveBasicObject[] colWbo = this.weaveApiClient.getCollection(collection, ids, older, newer, index_above, index_below, limit, offset, sort, format);
 		if ( decrypt ) {
@@ -440,7 +444,15 @@ public class WeaveStorageV5 extends WeaveStorageContext {
 		}
 		return colWbo;
 	}
-	
+
+	public WeaveCollectionInfo getCollectionInfo(String collection, boolean getcount, boolean getusage) throws WeaveException {
+		Map<String, WeaveCollectionInfo> wcols = this.weaveApiClient.getInfoCollections(getcount, getusage);
+		if ( !wcols.containsKey(collection) ) {
+			throw new WeaveException(String.format("Collection '%s' not found", collection));
+		}
+		return wcols.get(collection);
+	}
+
 	public Double put(String collection, String id, WeaveBasicObject wbo, boolean encrypt) throws WeaveException {
 		if ( encrypt ) {
 			try {

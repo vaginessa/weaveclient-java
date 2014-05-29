@@ -18,6 +18,8 @@ import java.io.InputStreamReader;
 import java.util.List;
 import java.util.LinkedList;
 import java.util.Iterator;
+import java.util.Map;
+import java.util.HashMap;
 
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpHost;
@@ -92,7 +94,66 @@ public class WeaveApiClientV1_1 extends WeaveApiClient {
 		
 		httpClient.setContext(context);
 	}
+	
+	public Map<String, WeaveCollectionInfo> getInfoCollections(boolean getcount, boolean getusage) throws WeaveException {
+		Log.getInstance().debug( "getInfoCollections()");
 		
+		Map<String, WeaveCollectionInfo> wcols = new HashMap<String, WeaveCollectionInfo>();
+		URI location = null;
+		JSONObject jsonObject = null;
+		
+		//Always get info/collections
+		location = this.storageURL.resolve(URIUtils.sanitize(String.format("/1.1/%s/info/collections", this.user)));			
+		jsonObject = getJSONPayload(location);
+
+		@SuppressWarnings("unchecked")
+		Iterator<String> itCol = jsonObject.keySet().iterator();
+		while ( itCol.hasNext() ) {
+			String collection = itCol.next();
+			WeaveCollectionInfo wcolInfo = new WeaveCollectionInfo(collection);
+			wcolInfo.modified = (Double)jsonObject.get(collection);
+			wcols.put(collection, wcolInfo);
+		}
+
+		//Optionally get info/collection_counts
+		if ( getcount ) {
+			location = this.storageURL.resolve(URIUtils.sanitize(String.format("/1.1/%s/info/collection_counts", this.user)));			
+			jsonObject = getJSONPayload(location);
+	
+			@SuppressWarnings("unchecked")
+			Iterator<String> itQuota = jsonObject.keySet().iterator();
+			while ( itQuota.hasNext() ) {
+				String collection = itQuota.next();
+				if ( wcols.containsKey(collection) ) {
+					wcols.get(collection).count = (Long)jsonObject.get(collection);
+				} else {
+					//quietly do nothing
+					//throw new WeaveException(String.format("Collection '%s' not in info/collections", collection));
+				}
+			}
+		}
+		
+		//Optionally get info/collection_usage
+		if ( getusage ) {
+			location = this.storageURL.resolve(URIUtils.sanitize(String.format("/1.1/%s/info/collection_usage", this.user)));			
+			jsonObject = getJSONPayload(location);
+	
+			@SuppressWarnings("unchecked")
+			Iterator<String> itUsage = jsonObject.keySet().iterator();
+			while ( itUsage.hasNext() ) {
+				String collection = itUsage.next();
+				if ( wcols.containsKey(collection) ) {
+					wcols.get(collection).usage = (Double)jsonObject.get(collection);
+				} else {
+					//quietly do nothing
+					//throw new WeaveException(String.format("Collection '%s' not in info/collections", collection));
+				}
+			}
+		}
+		
+		return wcols;
+	}
+	
 	public WeaveBasicObject get(String collection, String id) throws WeaveException {
 		URI location = this.storageURL.resolve(URIUtils.sanitize(String.format("/1.1/%s/storage/%s/%s", this.user, collection, id)));			
 		return this.get(location);
@@ -106,31 +167,15 @@ public class WeaveApiClientV1_1 extends WeaveApiClient {
 	public WeaveBasicObject get(URI location) throws WeaveException {
 		Log.getInstance().debug( "get()");
 		
-		JSONObject jsonObject = null;
+		JSONObject jsonObject = getJSONPayload(location);
 
 		//parse request content to extract JSON encoded WeaveBasicObject
 		try {
-
-			HttpEntity entity = httpClient.get(location);
-
-			JSONParser parser = new JSONParser();  
-			BufferedReader br = new BufferedReader(new InputStreamReader(entity.getContent()));	
-			jsonObject = (JSONObject)parser.parse(br);  
-
-		} catch (IOException e) {
-			throw new WeaveException(e);
-		} catch (HttpException e) {
-			throw new WeaveException(e);
-		} catch (ParseException e) {  
-			throw new WeaveException(e);  
-		}
-	
-		try {
 			String id         = (String)jsonObject.get("id");
 			Double modified   = (Double)jsonObject.get("modified");
-			Integer sortindex = (Integer)jsonObject.get("sortindex");
+			Long sortindex    = (Long)jsonObject.get("sortindex");
 			String payload    = (String)jsonObject.get("payload");
-			Integer ttl       = (Integer)jsonObject.get("ttl");
+			Long ttl          = (Long)jsonObject.get("ttl");
 			
 			return new WeaveBasicObject(id, modified, sortindex, ttl, payload);
 			
@@ -139,14 +184,48 @@ public class WeaveApiClientV1_1 extends WeaveApiClient {
 		}
 	}
 
-	public WeaveBasicObject[] getCollection(String collection, String[] ids, Double older, Double newer, Integer index_above, Integer index_below, Integer limit, Integer offset, String sort, String format) throws WeaveException {
+	public JSONObject getJSONPayload(URI location) throws WeaveException {
+		return getJSONPayload(location, false);
+	}
+
+	@SuppressWarnings("unchecked")
+	public JSONObject getJSONPayload(URI location, boolean isArray) throws WeaveException {
+		Log.getInstance().debug( "getJSONPayload()");
+		
+		JSONObject jsonObject = null;
+
+		//parse request content to extract JSON encoded object
+		try {
+
+			HttpEntity entity = httpClient.get(location);
+
+			JSONParser parser = new JSONParser();  
+			BufferedReader br = new BufferedReader(new InputStreamReader(entity.getContent()));
+			if ( isArray ) {
+				JSONArray jsonArray = (JSONArray)parser.parse(br);
+				jsonObject = new JSONObject();
+				jsonObject.put(null, jsonArray);
+			} else {
+				jsonObject = (JSONObject)parser.parse(br);
+			}
+
+		} catch (IOException e) {
+			throw new WeaveException(e);
+		} catch (HttpException e) {
+			throw new WeaveException(e);
+		} catch (ParseException e) {  
+			throw new WeaveException(e);  
+		}
+		
+		return jsonObject;
+	}
+
+	private URI buildCollectionUri(String collection, String[] ids, Double older, Double newer, Integer index_above, Integer index_below, Integer limit, Integer offset, String sort, String format, boolean full) throws WeaveException {
+
 		URI location = this.storageURL.resolve(URIUtils.sanitize(String.format("/1.1/%s/storage/%s", this.user, collection)));
 		
 		//Build list of URL querystring parameters
 		List<NameValuePair> params = new LinkedList<NameValuePair>();
-		
-		//required to bring back entire WBO
-		params.add(new BasicNameValuePair("full", "1"));
 		
 		if ( ids != null && ids.length > 0 ) {
 			for (int i = 0; i < ids.length; i++) {
@@ -183,6 +262,10 @@ public class WeaveApiClientV1_1 extends WeaveApiClient {
 			//Only default format supported
 			throw new WeaveException(String.format("getCollection() format parameter value of '%s' not supported", format));
 		}
+		if ( full ) {
+			//returns entire WBO
+			params.add(new BasicNameValuePair("full", "1"));
+		}
 
 		try {
 			location = new URI(
@@ -198,33 +281,51 @@ public class WeaveApiClientV1_1 extends WeaveApiClient {
 			throw new WeaveException(e);
 		}
 		
-		return getCollection(location);
+		return location;
 	}
 
+	public String[] getCollectionIds(String collection, String[] ids, Double older, Double newer, Integer index_above, Integer index_below, Integer limit, Integer offset, String sort) throws WeaveException {
+		URI location = buildCollectionUri(collection, ids, older, newer, index_above, index_below, limit, offset, sort, null, false);
+		return getCollectionIds(location);	
+	}
+
+	public String[] getCollectionIds(URI location) throws WeaveException {
+		Log.getInstance().debug( "getCollectionIds()");
+		
+		List<String> ids = new LinkedList<String>();
+		
+		//Get JSON payload and extract JSON array
+		JSONObject jsonTmp = getJSONPayload(location, true);
+		JSONArray jsonArray = (JSONArray)jsonTmp.get(null);
+
+		//Iterate through jsonArray and build list of ids
+		try {
+			@SuppressWarnings("unchecked")
+			Iterator<String> iterator = jsonArray.iterator();
+			while ( iterator.hasNext() ) {
+				ids.add((String)iterator.next());
+			}	
+		} catch (ClassCastException e) {
+			throw new WeaveException(e);
+		}
+		
+		return ids.toArray(new String[0]);
+	}
+
+	public WeaveBasicObject[] getCollection(String collection, String[] ids, Double older, Double newer, Integer index_above, Integer index_below, Integer limit, Integer offset, String sort, String format) throws WeaveException {
+		URI location = buildCollectionUri(collection, ids, older, newer, index_above, index_below, limit, offset, sort, format, true);
+		return getCollection(location);	
+	}
+		
 	public WeaveBasicObject[] getCollection(URI location) throws WeaveException {
 		Log.getInstance().debug( "getCollection()");
 		
-		JSONArray jsonArray = null;
-
-		//parse request content to extract JSON encoded WeaveBasicObject
-		try {
-
-			HttpEntity entity = httpClient.get(location);
-
-			JSONParser parser = new JSONParser();  
-			BufferedReader br = new BufferedReader(new InputStreamReader(entity.getContent()));	
-			jsonArray = (JSONArray)parser.parse(br);  
-
-		} catch (IOException e) {
-			throw new WeaveException(e);
-		} catch (HttpException e) {
-			throw new WeaveException(e);
-		} catch (ParseException e) {  
-			throw new WeaveException(e);  
-		}
-		
 		List<WeaveBasicObject> listWbo = new LinkedList<WeaveBasicObject>();
-		
+
+		//Get JSON payload and extract JSON array
+		JSONObject jsonTmp = getJSONPayload(location, true);
+		JSONArray jsonArray = (JSONArray)jsonTmp.get(null);
+
 		//Iterate through jsonArray and build WBOs
 		try {
 			@SuppressWarnings("unchecked")
@@ -234,9 +335,9 @@ public class WeaveApiClientV1_1 extends WeaveApiClient {
 				
 				String id         = (String)jsonObject.get("id");
 				Double modified   = (Double)jsonObject.get("modified");
-				Integer sortindex = (Integer)jsonObject.get("sortindex");
+				Long sortindex    = (Long)jsonObject.get("sortindex");
 				String payload    = (String)jsonObject.get("payload");
-				Integer ttl       = (Integer)jsonObject.get("ttl");
+				Long ttl          = (Long)jsonObject.get("ttl");
 				
 				listWbo.add(new WeaveBasicObject(id, modified, sortindex, ttl, payload));
 			}	

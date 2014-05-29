@@ -62,9 +62,19 @@ public class WeaveClient {
 	public WeaveBasicObject decryptWeaveBasicObject(WeaveBasicObject wbo, String keyLabel) throws WeaveException {
 		return ws.decryptWeaveBasicObject(wbo, keyLabel);
 	}
+
 	public WeaveBasicObject getItem(String collection, String id) throws WeaveException {
 		return ws.get(collection, id);
 	}
+
+	public WeaveCollectionInfo getCollectionInfo(String collection) throws WeaveException {
+		return ws.getCollectionInfo(collection, true, true);
+	}
+
+	public String[] getCollectionIds(String collection, String[] ids, Double older, Double newer, Integer index_above, Integer index_below, Integer limit, Integer offset, String sort) throws WeaveException {
+		return ws.getCollectionIds(collection, ids, older, newer, index_above, index_below, limit, offset, sort);
+	}
+
 	public WeaveBasicObject[] getCollection(String collection, String[] ids, Double older, Double newer, Integer index_above, Integer index_below, Integer limit, Integer offset, String sort, String format) throws WeaveException {
 		return ws.getCollection(collection, ids, older, newer, index_above, index_below, limit, offset, sort, format);
 	}
@@ -110,6 +120,7 @@ public class WeaveClient {
 		String id         = null;
 		String payload    = null;
 		boolean delete    = false;
+		boolean info      = false;
 		String loglevel   = null;
 		
 		WeaveClient.StorageVersion storageVersion = null;
@@ -117,12 +128,6 @@ public class WeaveClient {
 		// Parse commandline arguments
 		Options options = new Options();
 		
-		//options.addOption(
-		//		OptionBuilder.withDescription("print this message")
-		//		.withLongOpt("help")
-		//		.create('h')
-		//);
-			
 		options.addOption("h", "help", false, "print this message");
 		options.addOption("s", "server", true, "server URL");
 		options.addOption("u", "username", true, "username");
@@ -133,6 +138,7 @@ public class WeaveClient {
 		options.addOption("i", "id", true, "object ID");
 		options.addOption("m", "modify", true, "update item with given value in JSON format. Requires -c and -i");
 		options.addOption("d", "delete", false, "delete item. Requires -c and -i");
+		options.addOption("n", "info", false, "get collection info. Requires -c");
 		options.addOption("l", "log-level", true, "set log level (trace|debug|info|warn|error)");
 		
 		CommandLineParser parser = new GnuParser();
@@ -215,6 +221,14 @@ public class WeaveClient {
 			delete = true;
 		}
 
+		if ( cmd.hasOption('n') ) {
+			if ( !( id == null && payload == null ) ) {
+				//quietly do nothing
+			} else {
+				info = true;
+			}
+		}
+
 		//Need to set log level BEFORE instansiating Logger
 		loglevel = "warn";
 		if ( cmd.hasOption('l') ) {
@@ -273,6 +287,18 @@ public class WeaveClient {
 			}
 
 			//TODO - Handle collections
+
+		} else if ( info ) {
+			
+			WeaveCollectionInfo colinfo = null;
+			try {
+				colinfo = weaveClient.getCollectionInfo(collection);
+			} catch(WeaveException e) {
+				System.err.println(e.getMessage());
+				System.exit(1);
+			}
+
+			System.out.println(colinfo.toString());
 
 		} else {
 			

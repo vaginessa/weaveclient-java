@@ -56,12 +56,12 @@ public class URIUtils {
 				url = url + path;
 			
 			if (!url.equals(original))
-				Log.getInstance().warn( "Trying to repair invalid URL: " + original + " -> " + url);
+				Log.getInstance().warn("Trying to repair invalid URL: " + original + " -> " + url);
 			return url;
 			
 		} else {
 			
-			Log.getInstance().warn( "Couldn't sanitize URL: " + original);
+			Log.getInstance().warn("Couldn't sanitize URL: " + original);
 			return original;
 			
 		}
