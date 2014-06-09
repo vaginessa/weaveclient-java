@@ -1,10 +1,18 @@
 package org.exfio.weave.client;
 
 import org.exfio.weave.WeaveException;
+import org.exfio.weave.client.WeaveClient.StorageVersion;
+import org.exfio.weave.client.WeaveClient.ApiVersion;
 
 public abstract class WeaveStorageContext {
 	
+	protected StorageVersion version = null;
+	
 	public abstract void init(WeaveClientParams params) throws WeaveException;
+	
+	public StorageVersion getStorageVersion() { return version; }
+
+	public ApiVersion getApiVersion() { return getApiClient().getApiVersion(); }
 
 	public abstract WeaveApiClient getApiClient();
 

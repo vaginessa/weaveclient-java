@@ -16,27 +16,39 @@ import java.util.Map;
 
 import org.exfio.weave.WeaveException;
 import org.exfio.weave.net.HttpClient;
+import org.exfio.weave.client.WeaveClient.ApiVersion;
 
 public abstract class WeaveApiClient {
 	
-	private HttpClient httpClient = HttpClient.getInstance();
+	protected HttpClient httpClient = null;
+	protected ApiVersion version    = null;
 	
-	public static final WeaveApiClient getApiClient(WeaveClient.ApiVersion apiVersion) throws WeaveException {
+	public WeaveApiClient() throws WeaveException {
+		try {
+			httpClient = HttpClient.getInstance();
+		} catch (IOException e) {
+			throw new WeaveException(e);
+		}
+	}
+	
+	public static final WeaveApiClient getInstance(ApiVersion apiVersion) throws WeaveException {
 		//return WeaveClient for given storage context
-		
-		WeaveApiClient context = null;
+
+		WeaveApiClient apiClient = null;
 		
 		switch(apiVersion) {
 		case v1_1:
-			context = new WeaveApiClientV1_1();
+			apiClient  = new WeaveApiClientV1_1();
 			break;
 		default:
 			throw new WeaveException(String.format("Weave API version '%s' not recognised", apiVersion));
 		}
 		
-		return context;
+		return apiClient;
 	}
 
+	public ApiVersion getApiVersion() { return version; }
+	
 	public abstract void init(String baseURL, String user, String password) throws WeaveException;
 				
 	public abstract Map<String, WeaveCollectionInfo> getInfoCollections(boolean getcount, boolean getinfo) throws WeaveException;

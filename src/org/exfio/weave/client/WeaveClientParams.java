@@ -1,5 +1,7 @@
 package org.exfio.weave.client;
 
-public interface WeaveClientParams {
+import org.exfio.weave.client.WeaveClient.StorageVersion;
 
+public interface WeaveClientParams {
+	public StorageVersion getStorageVersion();
 }

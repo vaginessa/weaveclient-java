@@ -8,12 +8,10 @@
  * Contributors:
  *     Richard Hirner (bitfire web engineering) - initial API and implementation
  ******************************************************************************/
-package org.exfio.weave;
+package org.exfio.weave.util;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import org.exfio.weave.Log;
 
 public class URIUtils {
 	

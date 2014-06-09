@@ -1,4 +1,4 @@
-package org.exfio.weave;
+package org.exfio.weave.util;
 
 import org.slf4j.LoggerFactory;
 import org.slf4j.Logger;

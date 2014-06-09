@@ -9,11 +9,11 @@ import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
-import org.exfio.weave.Log;
-
+import org.json.simple.JSONObject;
 import org.exfio.weave.WeaveException;
 import org.exfio.weave.client.WeaveStorageContext;
 import org.exfio.weave.client.WeaveStorageV5;
+import org.exfio.weave.util.Log;
 
 public class WeaveClient {
 
@@ -30,7 +30,53 @@ public class WeaveClient {
 	protected WeaveClient(WeaveStorageContext ws) {
 		this.ws = ws;
 	}
+
+	private static final StorageVersion autoDiscoverStorageVersion(WeaveAutoDiscoverParams adParams) throws WeaveException {
+		StorageVersion storageVersion = null;
+		
+		WeaveApiClient apiClient = WeaveApiClient.getInstance(ApiVersion.v1_1);
+		apiClient.init(adParams.baseURL, adParams.user, adParams.password);
+		
+		WeaveBasicObject wbo = apiClient.get("meta/global");
+		JSONObject jsonPayload = null;
+		
+		try {
+			jsonPayload = wbo.getPayloadAsJSONObject();
+		} catch (org.json.simple.parser.ParseException e) {
+			throw new WeaveException(e);
+		}
+		
+		if ( !jsonPayload.containsKey("storageVersion") ) {
+			throw new WeaveException("Storage version not found in meta/global record");
+		}
+
+		Long version = (Long)jsonPayload.get("storageVersion");
+		
+		if ( version == 5 ) {
+			storageVersion = StorageVersion.v5;
+		} else {
+			throw new WeaveException(String.format("Storage version '%s' not supported", version));
+		}
+		
+		return storageVersion;
+	}
 	
+	public static final WeaveClient getInstance(WeaveClientParams params) throws WeaveException {
+		//return WeaveClient for given parameters
+		WeaveClient weaveClient = null;
+		
+		if ( params.getStorageVersion() == null ) {
+			//auto-discovery
+			StorageVersion storageVersion = autoDiscoverStorageVersion((WeaveAutoDiscoverParams)params);
+			weaveClient = getInstance(storageVersion);
+		} else {
+			weaveClient = getInstance(params.getStorageVersion());
+			weaveClient.init(params);
+		}
+		
+		return weaveClient;
+	}
+
 	public static final WeaveClient getInstance(StorageVersion storageVersion) throws WeaveException {
 		//return WeaveClient for given storage context
 		
@@ -54,6 +100,10 @@ public class WeaveClient {
 	
 	public void init(WeaveClientParams params) throws WeaveException {
 		ws.init(params);
+	}
+	
+	public StorageVersion getStorageVersion() {
+		return ws.getStorageVersion();
 	}
 	
 	public WeaveBasicObject decryptWeaveBasicObject(WeaveBasicObject wbo) throws WeaveException {
@@ -132,7 +182,7 @@ public class WeaveClient {
 		options.addOption("s", "server", true, "server URL");
 		options.addOption("u", "username", true, "username");
 		options.addOption("p", "password", true, "password");
-		options.addOption("v", "storage-version", true, "storage version (default 5)");		
+		options.addOption("v", "storage-version", true, "storage version (auto|5). Defaults to auto");		
 		options.addOption("k", "sync-key", true, "sync key (required for storage v5)");
 		options.addOption("c", "collection", true, "collection");
 		options.addOption("i", "id", true, "object ID");
@@ -179,8 +229,20 @@ public class WeaveClient {
 				storageVersion = WeaveClient.StorageVersion.v5;			
 			}
 		} else {
-			storageVersion = WeaveClient.StorageVersion.v5;			
+			try {
+				WeaveClient weaveClient = null;			
+				WeaveAutoDiscoverParams  adParams = new WeaveAutoDiscoverParams();
+				adParams.baseURL = baseURL;
+				adParams.user    = username;
+				adParams.password = password;				
+				weaveClient = WeaveClient.getInstance(adParams);
+				storageVersion = weaveClient.getStorageVersion();
+			} catch (WeaveException e) {
+				System.err.println(e.getMessage());
+				System.exit(1);
+			}		
 		}
+		
 		if ( storageVersion == WeaveClient.StorageVersion.v5 ){
 			//Only v5 is currently supported
 			if ( !cmd.hasOption('k') ) {

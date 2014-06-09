@@ -5,10 +5,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.security.SecureRandom;
 
-import org.exfio.weave.Log;
-import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.codec.binary.Base32;
-import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.StringUtils;
 import org.json.simple.JSONObject;
@@ -30,7 +27,11 @@ import java.security.InvalidKeyException;
 
 import org.exfio.weave.Constants;
 import org.exfio.weave.WeaveException;
+import org.exfio.weave.client.WeaveClient.StorageVersion;
 import org.exfio.weave.client.WeaveClientParams;
+import org.exfio.weave.util.Log;
+import org.exfio.weave.util.Hex;
+import org.exfio.weave.util.Base64;
 
 public class WeaveStorageV5 extends WeaveStorageContext {
 	
@@ -41,11 +42,13 @@ public class WeaveStorageV5 extends WeaveStorageContext {
 	private Map<String, WeaveKeyPair> bulkKeys;
 
 	public WeaveStorageV5() {
-		this.weaveApiClient = null;
-		this.user           = null;
-		this.syncKey        = null;
-		this.privateKey     = null;
-		this.bulkKeys       = null;
+		super();
+		version        = StorageVersion.v5;
+		weaveApiClient = null;
+		user           = null;
+		syncKey        = null;
+		privateKey     = null;
+		bulkKeys       = null;
 	}
 
 	public void init(WeaveClientParams params) throws WeaveException {
@@ -58,7 +61,7 @@ public class WeaveStorageV5 extends WeaveStorageContext {
 	}
 
 	public void init(String baseURL, String user, String password, String syncKey, WeaveClient.ApiVersion apiVersion) throws WeaveException {
-		this.weaveApiClient = WeaveApiClient.getApiClient(apiVersion);
+		this.weaveApiClient = WeaveApiClient.getInstance(apiVersion);
 		this.weaveApiClient.init(baseURL, user, password);
 		this.user            = user;
 		this.syncKey         = syncKey;

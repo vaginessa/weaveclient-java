@@ -29,39 +29,55 @@ import org.apache.http.config.RegistryBuilder;
 import org.apache.http.conn.socket.ConnectionSocketFactory;
 import org.apache.http.conn.socket.PlainConnectionSocketFactory;
 import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
-import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 //import org.apache.http.impl.conn.ManagedHttpClientConnectionFactory;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 
-import org.exfio.weave.Log;
 import org.exfio.weave.Constants;
 import org.exfio.weave.client.NotFoundException;
 import org.exfio.weave.client.PreconditionFailedException;
 import org.exfio.weave.net.HttpException;
+import org.exfio.weave.util.Log;
 
 
 public class HttpClient {
 
-	private static HttpClient INSTANCE;
+	private static HttpClient INSTANCE = null;
 	
-	private static CloseableHttpClient httpClient;
-	private static final ReentrantReadWriteLock httpClientLock = new ReentrantReadWriteLock();
-	
-	private static HttpClientContext context;
+	private static HttpClientContext context = null;
+	private static ConnectionSocketFactory sslSocketFactory = null;
+	private static CloseableHttpClient httpClient = null;
+	private static ReentrantReadWriteLock httpClientLock = null;
 
-	//Instansiate httpClient
-	static {
-		INSTANCE = new HttpClient();
+	private static String userAgent = "eXfio Weave/" + Constants.VERSION;
+
+	//---------------------------------
+	// Static (initialisation) methods
+	//---------------------------------
+	
+	//Initialise httpClient
+	public static void init() throws IOException {
+
+		if ( httpClient != null ) {
+			httpClientLock.writeLock().lock();
+			httpClient.close();
+			httpClient = null;
+			httpClientLock.writeLock().unlock();
+		}
+		
+		//Default to org.apache.http.ssl.SSLConnectionSocketFactory
+		if ( sslSocketFactory == null ) {
+			sslSocketFactory = SSLConnectionSocketFactory.getSocketFactory();
+		}
 		
 		RequestConfig defaultRqConfig;
 		Registry<ConnectionSocketFactory> socketFactoryRegistry;
 
 		socketFactoryRegistry =	RegistryBuilder.<ConnectionSocketFactory> create()
 				.register("http", PlainConnectionSocketFactory.getSocketFactory())
-				.register("https", SSLConnectionSocketFactory.getSocketFactory() )
+				.register("https", sslSocketFactory)
 				.build();
 		
 		// use request defaults from AndroidHttpClient
@@ -85,21 +101,40 @@ public class HttpClient {
 				.setConnectionManager(connectionManager)
 				.setDefaultRequestConfig(defaultRqConfig)
 				//.setRetryHandler(WeaveHttpRequestRetryHandler.getInstance())
-				.setUserAgent("eXfio Weave/" + Constants.VERSION)
+				.setUserAgent(userAgent)
 				.disableCookieManagement()
 				.build();
 
+		httpClientLock = new ReentrantReadWriteLock();
+
 		context = HttpClientContext.create();
+		INSTANCE = new HttpClient();		
 	}
 
-	public static HttpClient getInstance() {
+	public static HttpClient getInstance() throws IOException {
+		if ( INSTANCE == null ) {
+			init();
+		}
 		return INSTANCE;
 	}
+
+	public static void setSSLSocketFactory(ConnectionSocketFactory factory) {
+		sslSocketFactory = factory;
+	}
+
+	public static void setUserAgent(String userAgent) {
+		HttpClient.userAgent = userAgent;
+	}
+
+	
+	//---------------------------------
+	// Instance (post-initialisation) methods
+	//---------------------------------
 
 	public void setContext(HttpClientContext clientContext) {
 		context = clientContext;
 	}
-	
+
 	public void lock() {
 		httpClientLock.readLock().lock();
 	}
@@ -167,7 +202,12 @@ public class HttpClient {
 	public HttpEntity put(URI location, String content) throws IOException, HttpException {
 
 		HttpPut put = new HttpPut(location);
-		StringEntity entityPut = new StringEntity(content, ContentType.create("text/plain", "UTF-8"));
+		
+		//Backwards compatible with android version of org.apache.http
+		StringEntity entityPut = new StringEntity(content);
+		entityPut.setContentType("text/plain");
+		entityPut.setContentEncoding("UTF-8");
+		
 		put.setEntity(entityPut);
 		
 		CloseableHttpResponse response = null;

@@ -23,37 +23,45 @@ import java.util.HashMap;
 
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpHost;
+import org.apache.http.NameValuePair;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.client.AuthCache;
 import org.apache.http.client.protocol.HttpClientContext;
 import org.apache.http.client.utils.URLEncodedUtils;
-import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.impl.auth.BasicScheme;
 import org.apache.http.impl.client.BasicAuthCache;
 import org.apache.http.impl.client.BasicCredentialsProvider;
-import org.apache.http.NameValuePair;
+import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.util.EntityUtils;
+
 import org.json.simple.JSONObject;
 import org.json.simple.JSONArray;
 import org.json.simple.parser.JSONParser;  
 import org.json.simple.parser.ParseException;
-import org.exfio.weave.Log;
-import org.exfio.weave.URIUtils;
+
 import org.exfio.weave.WeaveException;
+import org.exfio.weave.client.WeaveClient.ApiVersion;
 import org.exfio.weave.net.HttpException;
-import org.exfio.weave.net.HttpClient;
+import org.exfio.weave.util.Log;
+import org.exfio.weave.util.URIUtils;
 
 
 public class WeaveApiClientV1_1 extends WeaveApiClient {
 		
-	private URI baseURL;	
+	private URI    baseURL;	
 	private String user;
 	private String password;
 	
 	private URI storageURL;
 	
-	private HttpClient httpClient = HttpClient.getInstance();
+	public WeaveApiClientV1_1() throws WeaveException {
+		super();
+		version  = ApiVersion.v1_1;
+		baseURL  = null;	
+		user     = null;
+		password = null;
+	}
 	
 	public void init(String baseURL, String user, String password) throws WeaveException {
 
@@ -94,7 +102,7 @@ public class WeaveApiClientV1_1 extends WeaveApiClient {
 		
 		httpClient.setContext(context);
 	}
-	
+		
 	public Map<String, WeaveCollectionInfo> getInfoCollections(boolean getcount, boolean getusage) throws WeaveException {
 		Log.getInstance().debug( "getInfoCollections()");
 		
