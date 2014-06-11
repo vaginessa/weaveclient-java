@@ -112,7 +112,7 @@ public class HttpClient {
 	}
 
 	public static HttpClient getInstance() throws IOException {
-		if ( INSTANCE == null ) {
+		if ( INSTANCE == null || httpClient == null) {
 			init();
 		}
 		return INSTANCE;
