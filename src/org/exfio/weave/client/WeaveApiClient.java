@@ -49,6 +49,8 @@ public abstract class WeaveApiClient {
 
 	public ApiVersion getApiVersion() { return version; }
 	
+	public abstract boolean register(String baseURL, String user, String password, String email) throws WeaveException;
+
 	public abstract void init(String baseURL, String user, String password) throws WeaveException;
 				
 	public abstract Map<String, WeaveCollectionInfo> getInfoCollections(boolean getcount, boolean getinfo) throws WeaveException;

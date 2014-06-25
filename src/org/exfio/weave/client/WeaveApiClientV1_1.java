@@ -63,6 +63,39 @@ public class WeaveApiClientV1_1 extends WeaveApiClient {
 		password = null;
 	}
 	
+	@SuppressWarnings("unchecked")
+	public boolean register(String baseURL, String user, String password, String email) throws WeaveException {
+		Log.getInstance().debug("register()");
+		
+		try {
+			this.baseURL  = new URI(baseURL);
+		} catch (URISyntaxException e) {
+			throw new WeaveException(e);
+		}
+
+		//Build registration URL
+		URI location = this.baseURL.resolve(URIUtils.sanitize(String.format("/user/1.1/%s", user)));
+				
+		//Build HTTP request content
+		JSONObject jobj = new JSONObject();
+		jobj.put("password", password);
+		jobj.put("email", email);
+		
+		//TODO - Support captcha
+		jobj.put("captcha-challenge", "");
+		jobj.put("captcha-response", "");
+
+		try {
+			httpClient.put(location, jobj.toJSONString());
+		} catch (IOException e) {
+			throw new WeaveException(e);
+		} catch (HttpException e) {
+			throw new WeaveException(e);
+		}
+		
+		return true;
+	}
+
 	public void init(String baseURL, String user, String password) throws WeaveException {
 
 		this.user     = user;
@@ -102,7 +135,7 @@ public class WeaveApiClientV1_1 extends WeaveApiClient {
 		
 		httpClient.setContext(context);
 	}
-		
+
 	public Map<String, WeaveCollectionInfo> getInfoCollections(boolean getcount, boolean getusage) throws WeaveException {
 		Log.getInstance().debug( "getInfoCollections()");
 		
@@ -236,9 +269,13 @@ public class WeaveApiClientV1_1 extends WeaveApiClient {
 		List<NameValuePair> params = new LinkedList<NameValuePair>();
 		
 		if ( ids != null && ids.length > 0 ) {
+			String value = "";
+			String delim = "";
 			for (int i = 0; i < ids.length; i++) {
-				params.add(new BasicNameValuePair("ids[]", ids[i]));
+				value = value + delim + ids[i];
+				delim = ",";
 			}
+			params.add(new BasicNameValuePair("ids", value));
 		}
 		if (older != null) {
 			params.add(new BasicNameValuePair("older", older.toString()));

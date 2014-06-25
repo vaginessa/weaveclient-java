@@ -9,7 +9,9 @@ import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
+
 import org.json.simple.JSONObject;
+
 import org.exfio.weave.WeaveException;
 import org.exfio.weave.client.WeaveStorageContext;
 import org.exfio.weave.client.WeaveStorageV5;
@@ -31,7 +33,15 @@ public class WeaveClient {
 		this.ws = ws;
 	}
 
-	private static final StorageVersion autoDiscoverStorageVersion(WeaveAutoDiscoverParams adParams) throws WeaveException {
+	private static final void registerAccount(WeaveRegistrationParams regParams) throws WeaveException {
+		Log.getInstance().debug("registerAccount()");
+		
+		WeaveApiClient apiClient = WeaveApiClient.getInstance(ApiVersion.v1_1);
+		
+		apiClient.register(regParams.baseURL, regParams.user, regParams.password, regParams.email);
+	}
+
+	private static final StorageVersion autoDiscoverStorageVersion(WeaveBasicParams adParams) throws WeaveException {
 		StorageVersion storageVersion = null;
 		
 		WeaveApiClient apiClient = WeaveApiClient.getInstance(ApiVersion.v1_1);
@@ -60,14 +70,14 @@ public class WeaveClient {
 		
 		return storageVersion;
 	}
-	
+
 	public static final WeaveClient getInstance(WeaveClientParams params) throws WeaveException {
 		//return WeaveClient for given parameters
 		WeaveClient weaveClient = null;
 		
 		if ( params.getStorageVersion() == null ) {
 			//auto-discovery
-			StorageVersion storageVersion = autoDiscoverStorageVersion((WeaveAutoDiscoverParams)params);
+			StorageVersion storageVersion = autoDiscoverStorageVersion((WeaveBasicParams)params);
 			weaveClient = getInstance(storageVersion);
 		} else {
 			weaveClient = getInstance(params.getStorageVersion());
@@ -182,6 +192,8 @@ public class WeaveClient {
 		options.addOption("s", "server", true, "server URL");
 		options.addOption("u", "username", true, "username");
 		options.addOption("p", "password", true, "password");
+		options.addOption("r", "register", false, "register");
+		options.addOption("e", "email", true, "email");
 		options.addOption("v", "storage-version", true, "storage version (auto|5). Defaults to auto");		
 		options.addOption("k", "sync-key", true, "sync key (required for storage v5)");
 		options.addOption("c", "collection", true, "collection");
@@ -205,6 +217,22 @@ public class WeaveClient {
 			System.exit(0);
 		}
 		
+		//Need to set log level BEFORE instansiating Logger
+		loglevel = "warn";
+		if ( cmd.hasOption('l') ) {
+			loglevel = cmd.getOptionValue('l').toLowerCase();
+			if ( !loglevel.matches("trace|debug|info|warn|error") ) {
+				System.err.println("log level must be one of (trace|debug|info|warn|error)");
+				System.exit(1);		
+			}
+		}
+		Log.init(loglevel);
+		
+		//DEBUG only
+		//Log.getInstance().warn("Log warn message");
+		//Log.getInstance().info("Log info message");
+		//Log.getInstance().debug("Log debug message");
+		
 		if ( !(cmd.hasOption('s') && cmd.hasOption('u') && cmd.hasOption('p')) ) {
 			System.err.println("server, username and password are required parameters");
 			System.exit(1);
@@ -223,6 +251,36 @@ public class WeaveClient {
 			System.exit(1);
 		}			
 
+		//Is this a registration
+		if ( cmd.hasOption('r') ) {
+			
+			if ( !cmd.hasOption('e') ) {
+				System.err.println("email is a required parameter for registration");
+				System.exit(1);
+			}
+			
+			String email = cmd.getOptionValue('e');
+			
+			Log.getInstance().info(String.format("Registering new account, user: '%s', pass: '%s'", username, password));
+			
+			try {			
+				WeaveRegistrationParams  regParams = new WeaveRegistrationParams();
+				regParams.baseURL  = baseURL;
+				regParams.user     = username;
+				regParams.password = password;
+				regParams.email    = email;
+				
+				WeaveClient.registerAccount(regParams);
+
+			} catch(WeaveException e) {
+				System.err.println(e.getMessage());
+				System.exit(1);
+			}
+			
+			System.out.println(String.format("Successfully registered account for user '%s'", username));
+			System.exit(0);
+		}
+
 		//Set storage version
 		if ( cmd.hasOption('v') ) {
 			if ( cmd.getOptionValue('v') == "5" ) {
@@ -230,13 +288,11 @@ public class WeaveClient {
 			}
 		} else {
 			try {
-				WeaveClient weaveClient = null;			
-				WeaveAutoDiscoverParams  adParams = new WeaveAutoDiscoverParams();
+				WeaveBasicParams  adParams = new WeaveBasicParams();
 				adParams.baseURL = baseURL;
 				adParams.user    = username;
 				adParams.password = password;				
-				weaveClient = WeaveClient.getInstance(adParams);
-				storageVersion = weaveClient.getStorageVersion();
+				storageVersion = WeaveClient.autoDiscoverStorageVersion(adParams);
 			} catch (WeaveException e) {
 				System.err.println(e.getMessage());
 				System.exit(1);
@@ -290,19 +346,6 @@ public class WeaveClient {
 				info = true;
 			}
 		}
-
-		//Need to set log level BEFORE instansiating Logger
-		loglevel = "warn";
-		if ( cmd.hasOption('l') ) {
-			loglevel = cmd.getOptionValue('l').toLowerCase();
-			if ( !loglevel.matches("trace|debug|info|warn|error") ) {
-				System.err.println("log level must be one of (trace|debug|info|warn|error)");
-				System.exit(1);		
-			}
-		}
-		Log.setLogLevel(loglevel);
-		
-		Log.getInstance().debug(cmd.getArgList().toString());
 
 		WeaveClient weaveClient = null;
 		

@@ -14,9 +14,11 @@ import java.net.URI;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.io.IOException;
 
+import org.apache.http.config.ConnectionConfig;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.HttpStatus;
+import org.apache.http.HttpVersion;
 import org.apache.http.StatusLine;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -27,19 +29,22 @@ import org.apache.http.client.protocol.HttpClientContext;
 import org.apache.http.config.Registry;
 import org.apache.http.config.RegistryBuilder;
 import org.apache.http.conn.socket.ConnectionSocketFactory;
+import org.apache.http.conn.ConnectionKeepAliveStrategy;
 import org.apache.http.conn.socket.PlainConnectionSocketFactory;
 import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
+import org.apache.http.impl.conn.ManagedHttpClientConnectionFactory;
 //import org.apache.http.impl.conn.ManagedHttpClientConnectionFactory;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
-
 import org.exfio.weave.Constants;
 import org.exfio.weave.client.NotFoundException;
 import org.exfio.weave.client.PreconditionFailedException;
 import org.exfio.weave.net.HttpException;
+import org.exfio.weave.net.HttpRequestRetryHandler;
 import org.exfio.weave.util.Log;
+
 
 
 public class HttpClient {
@@ -47,6 +52,7 @@ public class HttpClient {
 	private static HttpClient INSTANCE = null;
 	
 	private static HttpClientContext context = null;
+	private static ConnectionKeepAliveStrategy keepAlive;
 	private static ConnectionSocketFactory sslSocketFactory = null;
 	private static CloseableHttpClient httpClient = null;
 	private static ReentrantReadWriteLock httpClientLock = null;
@@ -66,7 +72,8 @@ public class HttpClient {
 			httpClient = null;
 			httpClientLock.writeLock().unlock();
 		}
-		
+
+		/*
 		//Default to org.apache.http.ssl.SSLConnectionSocketFactory
 		if ( sslSocketFactory == null ) {
 			sslSocketFactory = SSLConnectionSocketFactory.getSocketFactory();
@@ -104,6 +111,14 @@ public class HttpClient {
 				.setUserAgent(userAgent)
 				.disableCookieManagement()
 				.build();
+		 */
+
+		httpClient = HttpClients.custom()
+				.setRetryHandler(HttpRequestRetryHandler.INSTANCE)
+				.setUserAgent(userAgent)
+				.build();
+		
+		//httpClient = HttpClients.createDefault();
 
 		httpClientLock = new ReentrantReadWriteLock();
 
@@ -152,7 +167,8 @@ public class HttpClient {
 	
 	private static void closeResponse(CloseableHttpResponse response) {
 		try {
-			response.close();
+			//FIXME - closing the response at this point is closing connection
+			//response.close();
 		} catch (Exception e) {
 			//fail quietly
 			Log.getInstance().error( e.getMessage());
@@ -181,8 +197,10 @@ public class HttpClient {
 	}
 	
 	public HttpEntity get(URI location) throws IOException, HttpException {
-
+		Log.getInstance().debug("HttpClient::get()");
+		
 		HttpGet get = new HttpGet(location);
+		//get.setProtocolVersion(HttpVersion.HTTP_1_1);
 		CloseableHttpResponse response = null;
 		HttpEntity entity = null;
 		
@@ -202,6 +220,7 @@ public class HttpClient {
 	public HttpEntity put(URI location, String content) throws IOException, HttpException {
 
 		HttpPut put = new HttpPut(location);
+		//put.setProtocolVersion(HttpVersion.HTTP_1_1);
 		
 		//Backwards compatible with android version of org.apache.http
 		StringEntity entityPut = new StringEntity(content);
@@ -229,6 +248,7 @@ public class HttpClient {
 	public HttpEntity delete(URI location) throws IOException, HttpException {
 
 		HttpDelete del = new HttpDelete(location);
+		//del.setProtocolVersion(HttpVersion.HTTP_1_1);
 		CloseableHttpResponse response = null;
 		HttpEntity entity = null;
 		
