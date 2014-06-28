@@ -93,6 +93,8 @@ public class WeaveApiClientV1_1 extends WeaveApiClient {
 			throw new WeaveException(e);
 		}
 		
+		init(baseURL, user, password);
+		
 		return true;
 	}
 
@@ -107,6 +109,8 @@ public class WeaveApiClientV1_1 extends WeaveApiClient {
 			throw new WeaveException(e);
 		}
 
+		//TODO - confirm account exists, i.e. /user/1.1/USER returns 1
+		
 		//Get storageURL
 		URI location = this.baseURL.resolve(URIUtils.sanitize(String.format("/user/1.1/%s/node/weave", this.user)));		
 		try {
@@ -417,6 +421,11 @@ public class WeaveApiClientV1_1 extends WeaveApiClient {
 		return put(location, wbo);
 	}
 	
+	public Double put(String path, WeaveBasicObject wbo) throws WeaveException {
+		URI location = this.storageURL.resolve(URIUtils.sanitize(String.format("/1.1/%s/storage/%s", this.user, path)));
+		return this.put(location, wbo);
+	}
+
 	public Double put(URI location, WeaveBasicObject wbo) throws WeaveException {
 		Log.getInstance().debug("put()");
 		

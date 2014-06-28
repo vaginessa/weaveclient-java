@@ -27,6 +27,7 @@ import java.security.InvalidKeyException;
 
 import org.exfio.weave.Constants;
 import org.exfio.weave.WeaveException;
+import org.exfio.weave.client.WeaveClient.ApiVersion;
 import org.exfio.weave.client.WeaveClient.StorageVersion;
 import org.exfio.weave.client.WeaveClientParams;
 import org.exfio.weave.util.Log;
@@ -34,6 +35,13 @@ import org.exfio.weave.util.Hex;
 import org.exfio.weave.util.Base64;
 
 public class WeaveStorageV5 extends WeaveStorageContext {
+	
+	public static final String KEY_CRYPTO_PATH       = "crypto/keys";
+	public static final String KEY_CRYPTO_COLLECTION = "crypto";
+	public static final String KEY_CRYPTO_ID         = "keys";
+	public static final String KEY_META_PATH         = "meta/global";
+	public static final String KEY_META_COLLECTION   = "meta";
+	public static final String KEY_META_ID           = "global";
 	
 	private WeaveApiClient weaveApiClient;
 	private String user;
@@ -49,6 +57,70 @@ public class WeaveStorageV5 extends WeaveStorageContext {
 		syncKey        = null;
 		privateKey     = null;
 		bulkKeys       = null;
+	}
+
+	public void register(WeaveClientParams params) throws WeaveException {
+		WeaveRegistrationParams p = (WeaveRegistrationParams)params;
+		register(p.baseURL, p.user, p.password, p.email);
+	}
+
+	public void register(String baseURL, String user, String password, String email) throws WeaveException {
+		register(baseURL, user, password, email, WeaveClient.ApiVersion.v1_1);		
+	}
+
+	public void register(String baseURL, String user, String password, String email, WeaveClient.ApiVersion apiVersion) throws WeaveException {
+		this.weaveApiClient = WeaveApiClient.getInstance(apiVersion);
+		this.weaveApiClient.register(baseURL, user, password, email);
+		this.user            = user;
+		this.syncKey         = null;
+		this.privateKey      = null;
+		this.bulkKeys        = null;
+		
+		//1. Build and publish meta/global WBO
+		JSONObject metaObject = new JSONObject();
+		metaObject.put("syncID", generateWeaveID());
+		metaObject.put("storageVersion", WeaveClient.storageVersionToString(this.getStorageVersion()));
+		metaObject.put("engines", new JSONObject());
+
+		WeaveBasicObject wboMeta = new WeaveBasicObject(KEY_META_ID, null, null, null, metaObject.toJSONString());
+		
+		//Note meta/global is NOT encrypted
+		put(KEY_META_COLLECTION, KEY_META_ID, wboMeta, false);
+		
+		//2. Generate sync key
+        SecureRandom rnd = new SecureRandom();
+        byte[] syncKeyBin = rnd.generateSeed(16);
+        
+		Base32 b32codec = new Base32();
+        String syncKeyB32 = b32codec.encodeToString(syncKeyBin);
+        
+		// Remove dash chars, convert to uppercase and translate 8 and 9 to L and O
+		this.syncKey = syncKeyB32.toUpperCase()
+								.replace('L', '8')
+								.replace('O', '9')
+								.replaceAll("=", "");
+
+		Log.getInstance().debug( String.format("generated sync key: %s", this.syncKey));
+
+		//3. Generate default bulk key bundle
+		WeaveKeyPair defaultKeyPair = generateWeaveKeyPair();
+		
+		//4. Build and publish crypto/keys WBO
+		JSONObject cryptoObject = new JSONObject();
+		cryptoObject.put("collection", KEY_CRYPTO_COLLECTION);
+		cryptoObject.put("collections", new JSONObject());
+
+		JSONArray dkpArray = new JSONArray();
+		dkpArray.add(Base64.encodeBase64String(defaultKeyPair.cryptKey));
+		dkpArray.add(Base64.encodeBase64String(defaultKeyPair.hmacKey));
+		cryptoObject.put("default", dkpArray);
+
+		WeaveBasicObject wboCrypto = new WeaveBasicObject(KEY_CRYPTO_ID, null, null, null, cryptoObject.toJSONString());
+
+		//Encrypt payload with private keypair
+		wboCrypto = encryptWeaveBasicObject(wboCrypto, null);
+
+		weaveApiClient.put(KEY_CRYPTO_PATH, wboCrypto);
 	}
 
 	public void init(WeaveClientParams params) throws WeaveException {
@@ -76,7 +148,30 @@ public class WeaveStorageV5 extends WeaveStorageContext {
 	public void setApiClient(WeaveApiClient weaveApiClient) {
 		this.weaveApiClient = weaveApiClient;
 	}
-	
+
+	public WeaveClientParams getClientParams() {
+		WeaveStorageV5Params params = new WeaveStorageV5Params();
+		params.baseURL = null; //FIXME - get from API client
+		params.user    = this.user;
+		params.syncKey = this.syncKey;
+		
+		return params;
+	}
+
+	private String generateWeaveID() {
+        SecureRandom rnd = new SecureRandom();
+        byte[] weaveID = rnd.generateSeed(9);
+        return Base64.encodeToString(weaveID, Base64.NO_PADDING & Base64.NO_WRAP & Base64.URL_SAFE);
+	}
+
+	private WeaveKeyPair generateWeaveKeyPair() {
+        SecureRandom rnd = new SecureRandom();
+        WeaveKeyPair keyPair = new WeaveKeyPair();
+        keyPair.cryptKey = rnd.generateSeed(32);
+        keyPair.hmacKey = rnd.generateSeed(32);
+        return keyPair;
+	}
+
 	/**
      Fetch the private key for the user and storage context
      provided to this object, and decrypt the private key
@@ -146,7 +241,7 @@ public class WeaveStorageV5 extends WeaveStorageContext {
 		if ( this.bulkKeys == null ) {
 			Log.getInstance().info( "Fetching bulk keys from server");
 
-            WeaveBasicObject res = weaveApiClient.get("crypto/keys");
+            WeaveBasicObject res = weaveApiClient.get(KEY_CRYPTO_PATH);
 
             // Recursively call decrypt to extract key data
             String payload = this.decrypt(res.getPayload(), null);

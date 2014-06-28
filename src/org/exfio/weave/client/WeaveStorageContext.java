@@ -8,6 +8,8 @@ public abstract class WeaveStorageContext {
 	
 	protected StorageVersion version = null;
 	
+	public abstract void register(WeaveClientParams params) throws WeaveException;
+
 	public abstract void init(WeaveClientParams params) throws WeaveException;
 	
 	public StorageVersion getStorageVersion() { return version; }
@@ -15,6 +17,8 @@ public abstract class WeaveStorageContext {
 	public ApiVersion getApiVersion() { return getApiClient().getApiVersion(); }
 
 	public abstract WeaveApiClient getApiClient();
+	
+	public abstract WeaveClientParams getClientParams();
 
 	public abstract WeaveBasicObject decryptWeaveBasicObject(WeaveBasicObject wbo, String collection) throws WeaveException;
 

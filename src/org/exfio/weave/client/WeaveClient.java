@@ -33,21 +33,32 @@ public class WeaveClient {
 		this.ws = ws;
 	}
 
-	private static final void registerAccount(WeaveRegistrationParams regParams) throws WeaveException {
-		Log.getInstance().debug("registerAccount()");
-		
-		WeaveApiClient apiClient = WeaveApiClient.getInstance(ApiVersion.v1_1);
-		
-		apiClient.register(regParams.baseURL, regParams.user, regParams.password, regParams.email);
+	public static String storageVersionToString(StorageVersion version) {
+		String versionString = null;
+		switch (version) {
+		case v5:
+			versionString = "5";
+			break;
+		default:
+		}
+		return versionString;
 	}
 
-	private static final StorageVersion autoDiscoverStorageVersion(WeaveBasicParams adParams) throws WeaveException {
+	public static StorageVersion stringToStorageVersion(String version) {
+		StorageVersion storageVersion = null;
+		if ( version.equals("5") ) {
+			storageVersion = StorageVersion.v5;
+		}
+		return storageVersion;
+	}
+
+	public static final StorageVersion autoDiscoverStorageVersion(WeaveBasicParams adParams) throws WeaveException {
 		StorageVersion storageVersion = null;
 		
 		WeaveApiClient apiClient = WeaveApiClient.getInstance(ApiVersion.v1_1);
 		apiClient.init(adParams.baseURL, adParams.user, adParams.password);
 		
-		WeaveBasicObject wbo = apiClient.get("meta/global");
+		WeaveBasicObject wbo = apiClient.get(WeaveStorageV5.KEY_META_PATH);
 		JSONObject jsonPayload = null;
 		
 		try {
@@ -57,10 +68,15 @@ public class WeaveClient {
 		}
 		
 		if ( !jsonPayload.containsKey("storageVersion") ) {
-			throw new WeaveException("Storage version not found in meta/global record");
+			throw new WeaveException(String.format("Storage version not found in %s record", WeaveStorageV5.KEY_META_PATH));
 		}
 
-		Long version = (Long)jsonPayload.get("storageVersion");
+		Long version = null;
+		if (jsonPayload.get("storageVersion").getClass().equals(Long.class)) {
+			version = (Long)jsonPayload.get("storageVersion");
+		} else {
+			version = Long.parseLong((String)jsonPayload.get("storageVersion"));
+		}
 		
 		if ( version == 5 ) {
 			storageVersion = StorageVersion.v5;
@@ -111,11 +127,19 @@ public class WeaveClient {
 	public void init(WeaveClientParams params) throws WeaveException {
 		ws.init(params);
 	}
-	
+
+	public void registerAccount(WeaveClientParams params) throws WeaveException {
+		ws.register(params);
+	}
+
 	public StorageVersion getStorageVersion() {
 		return ws.getStorageVersion();
 	}
-	
+
+	public WeaveClientParams getClientParams() {
+		return ws.getClientParams();
+	}
+
 	public WeaveBasicObject decryptWeaveBasicObject(WeaveBasicObject wbo) throws WeaveException {
 		return decryptWeaveBasicObject(wbo, null);
 	}
@@ -183,7 +207,7 @@ public class WeaveClient {
 		boolean info      = false;
 		String loglevel   = null;
 		
-		WeaveClient.StorageVersion storageVersion = null;
+		StorageVersion storageVersion = null;
 		
 		// Parse commandline arguments
 		Options options = new Options();
@@ -194,7 +218,7 @@ public class WeaveClient {
 		options.addOption("p", "password", true, "password");
 		options.addOption("r", "register", false, "register");
 		options.addOption("e", "email", true, "email");
-		options.addOption("v", "storage-version", true, "storage version (auto|5). Defaults to auto");		
+		options.addOption("v", "storage-version", true, "storage version (auto|5). Defaults to auto");	
 		options.addOption("k", "sync-key", true, "sync key (required for storage v5)");
 		options.addOption("c", "collection", true, "collection");
 		options.addOption("i", "id", true, "object ID");
@@ -260,9 +284,18 @@ public class WeaveClient {
 			}
 			
 			String email = cmd.getOptionValue('e');
-			
+
+			//Set storage version
+			if ( cmd.hasOption('v') && !cmd.getOptionValue('v').equalsIgnoreCase("auto") ) {
+				storageVersion = stringToStorageVersion(cmd.getOptionValue('v'));
+			} else {
+				//Default to v5
+				storageVersion = StorageVersion.v5;
+			}
+
 			Log.getInstance().info(String.format("Registering new account, user: '%s', pass: '%s'", username, password));
 			
+			WeaveClient wc = null;
 			try {			
 				WeaveRegistrationParams  regParams = new WeaveRegistrationParams();
 				regParams.baseURL  = baseURL;
@@ -270,23 +303,26 @@ public class WeaveClient {
 				regParams.password = password;
 				regParams.email    = email;
 				
-				WeaveClient.registerAccount(regParams);
+				wc = WeaveClient.getInstance(storageVersion);
+				wc.registerAccount((WeaveClientParams)regParams);
 
 			} catch(WeaveException e) {
 				System.err.println(e.getMessage());
 				System.exit(1);
 			}
 			
-			System.out.println(String.format("Successfully registered account for user '%s'", username));
+			System.out.println(String.format("Successfully registered account for user: '%s'", username));
+			if ( storageVersion == StorageVersion.v5 ) {
+				System.out.println(String.format("Storage v5 sync key: '%s'", ((WeaveStorageV5Params)wc.getClientParams()).syncKey));
+			}			
 			System.exit(0);
 		}
 
 		//Set storage version
-		if ( cmd.hasOption('v') ) {
-			if ( cmd.getOptionValue('v') == "5" ) {
-				storageVersion = WeaveClient.StorageVersion.v5;			
-			}
+		if ( cmd.hasOption('v') && !cmd.getOptionValue('v').equalsIgnoreCase("auto") ) {
+			storageVersion = stringToStorageVersion(cmd.getOptionValue('v'));
 		} else {
+			//Auto-discover storage version if not explicitly set
 			try {
 				WeaveBasicParams  adParams = new WeaveBasicParams();
 				adParams.baseURL = baseURL;
