@@ -30,6 +30,8 @@ import org.exfio.weave.WeaveException;
 import org.exfio.weave.client.WeaveClient.ApiVersion;
 import org.exfio.weave.client.WeaveClient.StorageVersion;
 import org.exfio.weave.client.WeaveClientParams;
+import org.exfio.weave.crypto.PayloadCipher;
+import org.exfio.weave.crypto.WeaveKeyPair;
 import org.exfio.weave.util.Log;
 import org.exfio.weave.util.Hex;
 import org.exfio.weave.util.Base64;
@@ -94,7 +96,7 @@ public class WeaveStorageV5 extends WeaveStorageContext {
 		Base32 b32codec = new Base32();
         String syncKeyB32 = b32codec.encodeToString(syncKeyBin);
         
-		// Remove dash chars, convert to uppercase and translate 8 and 9 to L and O
+		// Remove dash chars, convert to uppercase and translate L and O to 8 and 9
 		this.syncKey = syncKeyB32.toUpperCase()
 								.replace('L', '8')
 								.replace('O', '9')
@@ -151,17 +153,18 @@ public class WeaveStorageV5 extends WeaveStorageContext {
 
 	public WeaveClientParams getClientParams() {
 		WeaveStorageV5Params params = new WeaveStorageV5Params();
-		params.baseURL = null; //FIXME - get from API client
-		params.user    = this.user;
-		params.syncKey = this.syncKey;
+		params.baseURL  = null; //FIXME - get from API client
+		params.user     = this.user;
+		params.password = null;
+		params.syncKey  = this.syncKey;
 		
 		return params;
 	}
 
-	private String generateWeaveID() {
+	public String generateWeaveID() {
         SecureRandom rnd = new SecureRandom();
         byte[] weaveID = rnd.generateSeed(9);
-        return Base64.encodeToString(weaveID, Base64.NO_PADDING & Base64.NO_WRAP & Base64.URL_SAFE);
+        return Base64.encodeToString(weaveID, Base64.NO_PADDING | Base64.NO_WRAP | Base64.URL_SAFE);
 	}
 
 	private WeaveKeyPair generateWeaveKeyPair() {
@@ -241,7 +244,12 @@ public class WeaveStorageV5 extends WeaveStorageContext {
 		if ( this.bulkKeys == null ) {
 			Log.getInstance().info( "Fetching bulk keys from server");
 
-            WeaveBasicObject res = weaveApiClient.get(KEY_CRYPTO_PATH);
+            WeaveBasicObject res = null;
+            try {
+            	res = weaveApiClient.get(KEY_CRYPTO_PATH);
+            } catch (NotFoundException e) {
+            	throw new WeaveException(KEY_CRYPTO_PATH + " not found " + e.getMessage());
+            }
 
             // Recursively call decrypt to extract key data
             String payload = this.decrypt(res.getPayload(), null);
@@ -306,23 +314,7 @@ public class WeaveStorageV5 extends WeaveStorageContext {
 	}
 	
 	public String decrypt(String payload, String collection) throws WeaveException {
-		String cleartext         = null;
-		JSONObject encryptObject = null;
 		
-        // Parse JSON encoded payload
-		try {
-			JSONParser parser = new JSONParser();			
-			encryptObject = (JSONObject)parser.parse(payload);  
-		} catch (ParseException e) {
-			throw new WeaveException(e);
-		}
-        
-        // An encrypted payload has three relevant fields
-        String ciphertext  = (String)encryptObject.get("ciphertext");
-        byte[] cipherbytes = Base64.decodeBase64(ciphertext);
-        byte[] iv          = Base64.decodeBase64((String)encryptObject.get("IV"));
-        String cipher_hmac = (String)encryptObject.get("hmac");
-        
         WeaveKeyPair keyPair = null;
         
         if ( collection == null ) {
@@ -341,58 +333,10 @@ public class WeaveStorageV5 extends WeaveStorageContext {
 
         	keyPair = this.getBulkKeyPair(collection);
         }
-            
-        Log.getInstance().debug( String.format("payload: %s, crypt key:  %s, crypt hmac: %s", payload, Hex.encodeHexString(keyPair.cryptKey), Hex.encodeHexString(keyPair.hmacKey)));
-            
-            
-        // 1. Validate hmac of ciphertext
-        // Note: HMAC verification is done against base64 encoded ciphertext
-        String local_hmac = null;
-        
-        try {
-            Mac hmacSHA256 = Mac.getInstance("HmacSHA256");
-            hmacSHA256.init(new SecretKeySpec(keyPair.hmacKey, "HmacSHA256"));
-            local_hmac = Hex.encodeHexString(hmacSHA256.doFinal(ciphertext.getBytes(Constants.ASCII)));
-		} catch (NoSuchAlgorithmException e) {
-			throw new WeaveException(e);
-		} catch (InvalidKeyException e) {
-			throw new WeaveException(e);
-		}
-        
-        if ( !local_hmac.equals(cipher_hmac) ) {
-        	Log.getInstance().warn(String.format("cipher hmac: %s, local hmac: %s", cipher_hmac, local_hmac));
-        	throw new WeaveException("HMAC verification failed!");
-        }
-            
-        // 2. Decrypt ciphertext
-        // Note: this is the same as this operation at the openssl command line:
-        // openssl enc -d -in data -aes-256-cbc -K `cat unwrapped_symkey.16` -iv `cat iv.16`
-        try {
-        	Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-        	cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(keyPair.cryptKey, "AES"), new IvParameterSpec(iv));
-        	
-        	byte[] clearbytes = cipher.doFinal(cipherbytes);
-        	cleartext = new String(clearbytes, Constants.UTF8);
-        	
-            Log.getInstance().debug(String.format("cleartext: %s", cleartext));
 
-        } catch (NoSuchAlgorithmException e) {
-			throw new WeaveException(e);
-		} catch (InvalidAlgorithmParameterException e) {
-			throw new WeaveException(e);
-		} catch (IllegalBlockSizeException e) {
-			throw new WeaveException(e);
-		} catch (NoSuchPaddingException e) {
-			throw new WeaveException(e);
-		} catch (BadPaddingException e) {
-			throw new WeaveException(e);
-		} catch (InvalidKeyException e) {
-			throw new WeaveException(e);
-        }
-
-        Log.getInstance().info("Successfully decrypted v5 data record");
+        PayloadCipher cipher = new PayloadCipher();
         
-		return cleartext;
+        return cipher.decrypt(payload, keyPair);        
 	}
 
 	public WeaveBasicObject encryptWeaveBasicObject(WeaveBasicObject wbo, String collection) throws WeaveException {
@@ -437,66 +381,9 @@ public class WeaveStorageV5 extends WeaveStorageContext {
 			keyPair = this.getBulkKeyPair(collection);
 		}
 		
-        Log.getInstance().debug( String.format("payload: %s, crypt key:  %s, crypt hmac: %s", plaintext, Hex.encodeHexString(keyPair.cryptKey), Hex.encodeHexString(keyPair.hmacKey)));
+		PayloadCipher cipher = new PayloadCipher();
 		
-        
-		// Encryption primitives
-        String ciphertext  = null;
-        byte[] cipherbytes = null;
-        byte[] iv          = null;
-        byte[] hmac        = null;
-        
-        // 1. Encrypt plaintext
-        // Note: this is the same as this operation at the openssl command line:
-        // openssl enc -d -in data -aes-256-cbc -K `cat unwrapped_symkey.16` -iv `cat iv.16`
-		
-        try {
-            SecureRandom rnd = new SecureRandom();
-            IvParameterSpec ivspec = new IvParameterSpec(rnd.generateSeed(16));
-            
-        	Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-        	cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(keyPair.cryptKey, "AES"), ivspec);
-        	cipherbytes = cipher.doFinal(plaintext.getBytes(Constants.ASCII));
-        	iv          = cipher.getIV();
-        	
-		} catch (NoSuchAlgorithmException e) {
-			throw new WeaveException(e);
-		} catch (InvalidAlgorithmParameterException e) {
-			throw new WeaveException(e);
-		} catch (IllegalBlockSizeException e) {
-			throw new WeaveException(e);
-		} catch (NoSuchPaddingException e) {
-			throw new WeaveException(e);
-		} catch (BadPaddingException e) {
-			throw new WeaveException(e);
-		} catch (InvalidKeyException e) {
-			throw new WeaveException(e);
-        }
-        
-        // 2. Create hmac of ciphertext
-        // Note: HMAC is done against base64 encoded ciphertext
-    	ciphertext = Base64.encodeBase64String(cipherbytes);
-    	
-    	try {
-            Mac hmacSHA256 = Mac.getInstance("HmacSHA256");
-            hmacSHA256.init(new SecretKeySpec(keyPair.hmacKey, "HmacSHA256"));
-            hmac = hmacSHA256.doFinal(ciphertext.getBytes(Constants.ASCII));
-		} catch (NoSuchAlgorithmException e) {
-			throw new WeaveException(e);
-		} catch (InvalidKeyException e) {
-			throw new WeaveException(e);
-		}
-
-		Log.getInstance().info( "Successfully encrypted v5 data record");
-
-        // Construct JSON encoded payload
-		JSONObject encryptObject = new JSONObject();
-		
-		encryptObject.put("ciphertext", ciphertext);
-		encryptObject.put("IV", Base64.encodeBase64String(iv));
-		encryptObject.put("hmac", Hex.encodeHexString(hmac));
-				
-		return encryptObject.toJSONString();
+		return cipher.encrypt(plaintext, keyPair);
 	}
 	
 	public boolean isEncrypted(WeaveBasicObject wbo) throws ParseException {
@@ -505,7 +392,7 @@ public class WeaveStorageV5 extends WeaveStorageContext {
 		return ( jsonPayload.containsKey("ciphertext") && jsonPayload.containsKey("IV") && jsonPayload.containsKey("hmac") );
 	}
 	
-	public WeaveBasicObject get(String collection, String id, boolean decrypt) throws WeaveException {
+	public WeaveBasicObject get(String collection, String id, boolean decrypt) throws WeaveException, NotFoundException {
 		WeaveBasicObject wbo = this.weaveApiClient.get(collection, id);
 		if ( decrypt ) {
 			try {
@@ -521,11 +408,11 @@ public class WeaveStorageV5 extends WeaveStorageContext {
 		return wbo;
 	}
 
-	public String[] getCollectionIds(String collection, String[] ids, Double older, Double newer, Integer index_above, Integer index_below, Integer limit, Integer offset, String sort) throws WeaveException {
+	public String[] getCollectionIds(String collection, String[] ids, Double older, Double newer, Integer index_above, Integer index_below, Integer limit, Integer offset, String sort) throws WeaveException, NotFoundException {
 		return this.weaveApiClient.getCollectionIds(collection, ids, older, newer, index_above, index_below, limit, offset, sort);
 	}
 
-	public WeaveBasicObject[] getCollection(String collection, String[] ids, Double older, Double newer, Integer index_above, Integer index_below, Integer limit, Integer offset, String sort, String format, boolean decrypt) throws WeaveException {
+	public WeaveBasicObject[] getCollection(String collection, String[] ids, Double older, Double newer, Integer index_above, Integer index_below, Integer limit, Integer offset, String sort, String format, boolean decrypt) throws WeaveException, NotFoundException {
 		WeaveBasicObject[] colWbo = this.weaveApiClient.getCollection(collection, ids, older, newer, index_above, index_below, limit, offset, sort, format);
 		if ( decrypt ) {
 			try {
@@ -566,8 +453,12 @@ public class WeaveStorageV5 extends WeaveStorageContext {
 		return this.weaveApiClient.put(collection, id, wbo);
 	}
 
-	public void delete(String collection, String id) throws WeaveException {
-		this.weaveApiClient.delete(collection, id);
+	public Double delete(String collection, String id) throws WeaveException {
+		return this.weaveApiClient.delete(collection, id);
+	}
+
+	public Double deleteCollection(String collection, String[] ids, Double older, Double newer, Integer limit, Integer offset, String sort) throws WeaveException, NotFoundException {
+		return this.weaveApiClient.deleteCollection(collection, ids, older, newer, limit, offset, sort);
 	}
 
 }

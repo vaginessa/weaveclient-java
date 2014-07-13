@@ -25,6 +25,7 @@ import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPut;
 import org.apache.http.client.methods.HttpDelete;
+import org.apache.http.client.methods.HttpUriRequest; 
 import org.apache.http.client.protocol.HttpClientContext;
 import org.apache.http.config.Registry;
 import org.apache.http.config.RegistryBuilder;
@@ -38,6 +39,7 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.ManagedHttpClientConnectionFactory;
 //import org.apache.http.impl.conn.ManagedHttpClientConnectionFactory;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
+
 import org.exfio.weave.Constants;
 import org.exfio.weave.client.NotFoundException;
 import org.exfio.weave.client.PreconditionFailedException;
@@ -123,6 +125,7 @@ public class HttpClient {
 		httpClientLock = new ReentrantReadWriteLock();
 
 		context = HttpClientContext.create();
+		
 		INSTANCE = new HttpClient();		
 	}
 
@@ -164,104 +167,9 @@ public class HttpClient {
 		httpClient = null;
 		httpClientLock.writeLock().unlock();
 	}
-	
-	private static void closeResponse(CloseableHttpResponse response) {
-		try {
-			//FIXME - closing the response at this point is closing connection
-			//response.close();
-		} catch (Exception e) {
-			//fail quietly
-			Log.getInstance().error( e.getMessage());
-		}
-	}
-	
-	private static void checkResponse(HttpResponse response) throws HttpException {
-		checkResponse(response.getStatusLine());
-	}
-	
-	private static void checkResponse(StatusLine statusLine) throws HttpException {
-		int code = statusLine.getStatusCode();
-		
-		if (code/100 == 1 || code/100 == 2)		// everything OK
-			return;
-		
-		String reason = code + " " + statusLine.getReasonPhrase();
-		switch (code) {
-		case HttpStatus.SC_NOT_FOUND:
-			throw new NotFoundException(reason);
-		case HttpStatus.SC_PRECONDITION_FAILED:
-			throw new PreconditionFailedException(reason);
-		default:
-			throw new HttpException(code, reason);
-		}
-	}
-	
-	public HttpEntity get(URI location) throws IOException, HttpException {
-		Log.getInstance().debug("HttpClient::get()");
-		
-		HttpGet get = new HttpGet(location);
-		//get.setProtocolVersion(HttpVersion.HTTP_1_1);
-		CloseableHttpResponse response = null;
-		HttpEntity entity = null;
-		
-		//parse request content to extract JSON encoded WeaveBasicObject
-		try {
-			response = httpClient.execute(get, context);
-			checkResponse(response);
-			entity = response.getEntity();
-		} finally {
-			if ( response != null )
-				closeResponse(response);
-		}
-		
-		return entity;
+
+	public CloseableHttpResponse execute(HttpUriRequest request) throws IOException {
+		return httpClient.execute(request, context);
 	}
 
-	public HttpEntity put(URI location, String content) throws IOException, HttpException {
-
-		HttpPut put = new HttpPut(location);
-		//put.setProtocolVersion(HttpVersion.HTTP_1_1);
-		
-		//Backwards compatible with android version of org.apache.http
-		StringEntity entityPut = new StringEntity(content);
-		entityPut.setContentType("text/plain");
-		entityPut.setContentEncoding("UTF-8");
-		
-		put.setEntity(entityPut);
-		
-		CloseableHttpResponse response = null;
-		HttpEntity entityResponse = null;
-		
-		//parse request content to extract JSON encoded WeaveBasicObject
-		try {
-			response = httpClient.execute(put, context);
-			checkResponse(response);
-			entityResponse = response.getEntity();
-		} finally {
-			if ( response != null )
-				closeResponse(response);
-		}
-		
-		return entityResponse;
-	}
-
-	public HttpEntity delete(URI location) throws IOException, HttpException {
-
-		HttpDelete del = new HttpDelete(location);
-		//del.setProtocolVersion(HttpVersion.HTTP_1_1);
-		CloseableHttpResponse response = null;
-		HttpEntity entity = null;
-		
-		//parse request content to extract JSON encoded WeaveBasicObject
-		try {
-			response = httpClient.execute(del, context);
-			checkResponse(response);
-			entity = response.getEntity();
-		} finally {
-			if ( response != null )
-				closeResponse(response);
-		}
-		
-		return entity;
-	}
 }

@@ -1,7 +1,11 @@
 package org.exfio.weave.client;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URI;
+import java.util.Properties;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -9,15 +13,18 @@ import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
-
 import org.json.simple.JSONObject;
-
 import org.exfio.weave.WeaveException;
 import org.exfio.weave.client.WeaveStorageContext;
 import org.exfio.weave.client.WeaveStorageV5;
 import org.exfio.weave.util.Log;
 
 public class WeaveClient {
+
+	//Config file
+	public static final String CONFIG_PATH         = ".exfioweave";
+	public static final String CONFIG_GLOBAL_FILE  = "exfioweave";
+	public static final String CONFIG_CLIENT_FILE  = "account";
 
 	private WeaveStorageContext ws;
 	
@@ -58,7 +65,12 @@ public class WeaveClient {
 		WeaveApiClient apiClient = WeaveApiClient.getInstance(ApiVersion.v1_1);
 		apiClient.init(adParams.baseURL, adParams.user, adParams.password);
 		
-		WeaveBasicObject wbo = apiClient.get(WeaveStorageV5.KEY_META_PATH);
+		WeaveBasicObject wbo = null;
+		try {
+			wbo = apiClient.get(WeaveStorageV5.KEY_META_PATH);
+		} catch (NotFoundException e) {
+			throw new WeaveException(WeaveStorageV5.KEY_META_PATH + " not found " + e.getMessage());
+		}
 		JSONObject jsonPayload = null;
 		
 		try {
@@ -119,7 +131,6 @@ public class WeaveClient {
 		return new WeaveClient(context);
 	}
 
-	
 	//**********************************
 	// Weave Client Public Methods
 	//**********************************
@@ -140,6 +151,10 @@ public class WeaveClient {
 		return ws.getClientParams();
 	}
 
+	public String generateWeaveID() {
+		return ws.generateWeaveID();
+	}
+	
 	public WeaveBasicObject decryptWeaveBasicObject(WeaveBasicObject wbo) throws WeaveException {
 		return decryptWeaveBasicObject(wbo, null);
 	}
@@ -147,28 +162,44 @@ public class WeaveClient {
 		return ws.decryptWeaveBasicObject(wbo, keyLabel);
 	}
 
-	public WeaveBasicObject getItem(String collection, String id) throws WeaveException {
+	public WeaveBasicObject getItem(String collection, String id) throws WeaveException, NotFoundException {
 		return ws.get(collection, id);
+	}
+
+	public WeaveBasicObject getItem(String collection, String id, boolean decrypt) throws WeaveException, NotFoundException {
+		return ws.get(collection, id, decrypt);
 	}
 
 	public WeaveCollectionInfo getCollectionInfo(String collection) throws WeaveException {
 		return ws.getCollectionInfo(collection, true, true);
 	}
 
-	public String[] getCollectionIds(String collection, String[] ids, Double older, Double newer, Integer index_above, Integer index_below, Integer limit, Integer offset, String sort) throws WeaveException {
+	public String[] getCollectionIds(String collection, String[] ids, Double older, Double newer, Integer index_above, Integer index_below, Integer limit, Integer offset, String sort) throws WeaveException, NotFoundException {
 		return ws.getCollectionIds(collection, ids, older, newer, index_above, index_below, limit, offset, sort);
 	}
 
-	public WeaveBasicObject[] getCollection(String collection, String[] ids, Double older, Double newer, Integer index_above, Integer index_below, Integer limit, Integer offset, String sort, String format) throws WeaveException {
+	public WeaveBasicObject[] getCollection(String collection, String[] ids, Double older, Double newer, Integer index_above, Integer index_below, Integer limit, Integer offset, String sort, String format) throws WeaveException, NotFoundException {
 		return ws.getCollection(collection, ids, older, newer, index_above, index_below, limit, offset, sort, format);
+	}
+
+	public WeaveBasicObject[] getCollection(String collection, String[] ids, Double older, Double newer, Integer index_above, Integer index_below, Integer limit, Integer offset, String sort, String format, boolean decrypt) throws WeaveException, NotFoundException {
+		return ws.getCollection(collection, ids, older, newer, index_above, index_below, limit, offset, sort, format, decrypt);
 	}
 
 	public Double putItem(String collection, String id, WeaveBasicObject wbo) throws WeaveException {
 		return ws.put(collection, id, wbo);
 	}
 
-	public void deleteItem(String collection, String id) throws WeaveException {
-		ws.delete(collection, id);
+	public Double putItem(String collection, String id, WeaveBasicObject wbo, boolean encrypt) throws WeaveException {
+		return ws.put(collection, id, wbo, encrypt);
+	}
+
+	public Double deleteItem(String collection, String id) throws WeaveException, NotFoundException {
+		return ws.delete(collection, id);
+	}
+
+	public Double deleteCollection(String collection, String[] ids, Double older, Double newer, Integer limit, Integer offset, String sort) throws WeaveException, NotFoundException {
+		return ws.deleteCollection(collection, ids, older, newer, limit, offset, sort);
 	}
 
 	public void lock() {
@@ -188,6 +219,67 @@ public class WeaveClient {
 	// CLI interface and helper methods
 	//**********************************
 
+	public static File buildGlobalConfigPath() {
+		//Build path to global config file
+		File configPath = new File(System.getProperty("user.home"), WeaveClient.CONFIG_PATH);
+		return new File(configPath, "exfioweave.properties");
+	}
+
+	public static File buildAccountConfigPath() throws IOException {
+		return buildAccountConfigPath(null);
+	}
+	
+	public static File buildAccountConfigPath(String accountName) throws IOException {
+		//Get path to config file for accountName
+
+		if ( accountName == null ) {
+			accountName = "default";
+		}
+		
+		//Load global config file
+		File globalFile = buildGlobalConfigPath();
+		Properties globalProp = new Properties();
+		
+		try {
+			globalProp.load(new FileInputStream(globalFile));
+		} catch (IOException e) {
+			throw new IOException(String.format("Couldn't load global config file '%s'", globalFile.getAbsolutePath()));
+		}
+
+		//Get configKey for accountName
+		String configKey = globalProp.getProperty("account." + accountName);
+		
+		return buildAccountConfigPathForKey(configKey);		
+	}
+
+	public static File buildAccountConfigPathForKey(String configKey) {
+		//Build path to account config file
+		File configPath = new File(System.getProperty("user.home"), WeaveClient.CONFIG_PATH);
+		return new File(configPath, String.format("%s.%s.properties", WeaveClient.CONFIG_CLIENT_FILE, configKey));		
+	}
+
+	public static Properties loadAccountConfig() throws IOException {
+		return loadAccountConfig(null);
+	}
+	
+	public static Properties loadAccountConfig(String accountName) throws IOException {
+		File configFile = buildAccountConfigPath(accountName);
+		Properties prop = new Properties();
+		prop.load(new FileInputStream(configFile));
+		return prop;
+	}
+
+	public static void writeAccountConfig(Properties prop) throws IOException {
+		writeAccountConfig(prop, null);
+	}
+
+	public static void writeAccountConfig(Properties prop, String accountName) throws IOException {
+		//Build path to config file
+		File configFile = buildAccountConfigPath(accountName);
+		configFile.getParentFile().mkdirs();
+		prop.store(new FileOutputStream(configFile), "");
+	}
+
 	public static void printUsage(Options options) {
 		System.out.println();
 		HelpFormatter formatter = new HelpFormatter();
@@ -200,11 +292,13 @@ public class WeaveClient {
 		String username   = null;
 		String password   = null;
 		String synckey    = null;
+		String email      = null;
 		String collection = null;
 		String id         = null;
 		String payload    = null;
 		boolean delete    = false;
 		boolean info      = false;
+		boolean encrypt   = true;
 		String loglevel   = null;
 		
 		StorageVersion storageVersion = null;
@@ -216,12 +310,15 @@ public class WeaveClient {
 		options.addOption("s", "server", true, "server URL");
 		options.addOption("u", "username", true, "username");
 		options.addOption("p", "password", true, "password");
-		options.addOption("r", "register", false, "register");
+		options.addOption("r", "register", true, "register");
 		options.addOption("e", "email", true, "email");
 		options.addOption("v", "storage-version", true, "storage version (auto|5). Defaults to auto");	
 		options.addOption("k", "sync-key", true, "sync key (required for storage v5)");
+		options.addOption("f", "config-file", true, "load config from file");
+		options.addOption("a", "account", true, "load config for account");
 		options.addOption("c", "collection", true, "collection");
 		options.addOption("i", "id", true, "object ID");
+		options.addOption("t", "plaintext", false, "do not encrypt/decrypt item");
 		options.addOption("m", "modify", true, "update item with given value in JSON format. Requires -c and -i");
 		options.addOption("d", "delete", false, "delete item. Requires -c and -i");
 		options.addOption("n", "info", false, "get collection info. Requires -c");
@@ -256,34 +353,38 @@ public class WeaveClient {
 		//Log.getInstance().warn("Log warn message");
 		//Log.getInstance().info("Log info message");
 		//Log.getInstance().debug("Log debug message");
-		
-		if ( !(cmd.hasOption('s') && cmd.hasOption('u') && cmd.hasOption('p')) ) {
-			System.err.println("server, username and password are required parameters");
-			System.exit(1);
-		}
-
-		//Set host and credential details
-		baseURL  = cmd.getOptionValue('s');
-		username = cmd.getOptionValue('u');
-		password = cmd.getOptionValue('p');
-
-		//Validate URI syntax
-		try {
-			URI.create(baseURL);
-		} catch (IllegalArgumentException e) {
-			System.err.printf("'%s' is not a valid URI, i.e. should be http(s)://example.com\n", baseURL);
-			System.exit(1);
-		}			
 
 		//Is this a registration
 		if ( cmd.hasOption('r') ) {
 			
-			if ( !cmd.hasOption('e') ) {
-				System.err.println("email is a required parameter for registration");
+			String accountName = cmd.getOptionValue('r');
+
+			//Set host and credential details
+			baseURL  = cmd.getOptionValue('s');
+			username = cmd.getOptionValue('u');
+			password = cmd.getOptionValue('p');
+			email    = cmd.getOptionValue('e');
+
+			if (
+				(baseURL == null || baseURL.isEmpty())
+				||
+				(username == null || username.isEmpty())
+				||
+				(password == null || password.isEmpty())
+				||
+				(email == null || email.isEmpty())
+			) {
+				System.err.println("server, username, password and email are required parameters for registration");
 				System.exit(1);
 			}
-			
-			String email = cmd.getOptionValue('e');
+
+			//Validate URI syntax
+			try {
+				URI.create(baseURL);
+			} catch (IllegalArgumentException e) {
+				System.err.printf("'%s' is not a valid URI, i.e. should be http(s)://example.com\n", baseURL);
+				System.exit(1);
+			}			
 
 			//Set storage version
 			if ( cmd.hasOption('v') && !cmd.getOptionValue('v').equalsIgnoreCase("auto") ) {
@@ -304,7 +405,7 @@ public class WeaveClient {
 				regParams.email    = email;
 				
 				wc = WeaveClient.getInstance(storageVersion);
-				wc.registerAccount((WeaveClientParams)regParams);
+				wc.registerAccount(regParams);
 
 			} catch(WeaveException e) {
 				System.err.println(e.getMessage());
@@ -312,11 +413,111 @@ public class WeaveClient {
 			}
 			
 			System.out.println(String.format("Successfully registered account for user: '%s'", username));
-			if ( storageVersion == StorageVersion.v5 ) {
-				System.out.println(String.format("Storage v5 sync key: '%s'", ((WeaveStorageV5Params)wc.getClientParams()).syncKey));
-			}			
+			
+			if ( wc.getStorageVersion() == StorageVersion.v5 ) {
+				
+				//Generate config key
+				String configKey = wc.generateWeaveID();
+
+				//Save account details
+				WeaveStorageV5Params clientParams = (WeaveStorageV5Params)wc.getClientParams();
+
+				System.out.println(String.format("Storage v5 sync key: '%s'", clientParams.syncKey));
+
+				//Create client config
+				File clientConfig = buildAccountConfigPathForKey(configKey);			
+				Properties clientProp = new Properties();
+				
+				clientProp.setProperty("server", clientParams.baseURL);
+				clientProp.setProperty("username", clientParams.user);
+				clientProp.setProperty("synckey", clientParams.syncKey);
+				
+				try {
+					clientConfig.getParentFile().mkdirs();
+					clientProp.store(new FileOutputStream(clientConfig), "");
+				} catch (IOException e) {
+					throw new AssertionError(String.format("Couldn't write client config file '%s'", clientConfig.getAbsolutePath()));
+				}	
+
+				//Create global config if required
+				File globalConfig = buildGlobalConfigPath();
+				Properties globalProp = new Properties();
+				
+				if ( globalConfig.exists() ) {
+					try {
+						globalProp.load(new FileInputStream(globalConfig));
+					} catch (IOException e) {
+						throw new AssertionError(String.format("Couldn't load global config file '%s'", globalConfig.getAbsolutePath()));
+					}
+				} else {
+					globalProp.setProperty("account.default", configKey);
+				}
+
+				globalProp.setProperty("account." + accountName, configKey);
+				
+				try {
+					globalProp.store(new FileOutputStream(globalConfig), "");
+				} catch (IOException e) {
+					throw new AssertionError(String.format("Couldn't write global config file '%s'", globalConfig.getAbsolutePath()));
+				}
+				
+			} else {
+				Log.getInstance().warn(String.format("Don't know how to store params for storage version %s", WeaveClient.storageVersionToString(wc.getStorageVersion())));
+			}
+			
 			System.exit(0);
 		}
+		
+		//Load client config
+		Properties clientProp = new Properties();
+		File clientConfig = null;
+		
+		if ( cmd.hasOption('f') || cmd.hasOption('a') ) {
+			try {
+				if ( cmd.hasOption('f') ) {
+					clientConfig = new File(cmd.getOptionValue('f'));
+				} else if ( cmd.hasOption('a') ) {
+					clientConfig = WeaveClient.buildAccountConfigPath(cmd.getOptionValue('a'));
+				}
+				
+				clientProp.load(new FileInputStream(clientConfig));
+				
+			} catch (IOException e) {
+				System.err.println(String.format("Couldn't load client config - %s", e.getMessage()));
+				System.exit(1);
+			}
+
+			//Set host and credential details from config file
+			baseURL  = clientProp.getProperty("server");
+			username = clientProp.getProperty("username");
+			
+		} else {
+			
+			//Set host and credential details from command line
+			baseURL  = cmd.getOptionValue('s', null);
+			username = cmd.getOptionValue('u', null);
+		}
+
+		password = cmd.getOptionValue('p', null);
+
+		if (
+			(baseURL == null || baseURL.isEmpty())
+			||
+			(username == null || username.isEmpty())
+			||
+			(password == null || password.isEmpty())
+		) {
+			System.err.println("server, username and password are required parameters");
+			System.exit(1);
+		}
+
+		//Validate URI syntax
+		try {
+			URI.create(baseURL);
+		} catch (IllegalArgumentException e) {
+			System.err.printf("'%s' is not a valid URI, i.e. should be http(s)://example.com\n", baseURL);
+			System.exit(1);
+		}			
 
 		//Set storage version
 		if ( cmd.hasOption('v') && !cmd.getOptionValue('v').equalsIgnoreCase("auto") ) {
@@ -335,21 +536,29 @@ public class WeaveClient {
 			}		
 		}
 		
-		if ( storageVersion == WeaveClient.StorageVersion.v5 ){
+		if ( storageVersion == WeaveClient.StorageVersion.v5 ) {
 			//Only v5 is currently supported
-			if ( !cmd.hasOption('k') ) {
+			
+			if ( cmd.hasOption('f') || cmd.hasOption('a') ) {
+				//Get synckey from config file
+				synckey = clientProp.getProperty("synckey", null);
+			} else {
+				//Get synckey from command line
+				synckey = cmd.getOptionValue('k', null);				
+			}
+
+			if ( synckey == null || synckey.isEmpty() ) {
 				System.err.println("sync-key is a required parameter for storage version 5");
 				System.exit(1);
 			}
-			synckey = cmd.getOptionValue('k');
 		}		
 		
 		//Set collection
-		if ( !cmd.hasOption('c') ) {
+		collection = cmd.getOptionValue('c', null);
+		if ( collection == null || collection.isEmpty() ) {
 			System.err.println("collection is a required parameter");
 			System.exit(1);
 		}
-		collection = cmd.getOptionValue('c');
 
 		//Optionally get ID
 		if ( cmd.hasOption('i') ) {
@@ -383,6 +592,10 @@ public class WeaveClient {
 			}
 		}
 
+		if ( cmd.hasOption('t') ) {
+			encrypt = false;
+		}
+
 		WeaveClient weaveClient = null;
 		
 		if ( storageVersion == WeaveClient.StorageVersion.v5 ){
@@ -411,7 +624,7 @@ public class WeaveClient {
 
 			Double modified = null;
 			try {
-				modified = weaveClient.putItem(collection, id, wbo);
+				modified = weaveClient.putItem(collection, id, wbo, encrypt);
 			} catch(WeaveException e) {
 				System.err.println(e.getMessage());
 				System.exit(1);
@@ -422,6 +635,9 @@ public class WeaveClient {
 			
 			try {
 				weaveClient.deleteItem(collection, id);
+			} catch (NotFoundException e) {
+				System.err.println(String.format("Collection '%s' item '%s' not found - " + e.getMessage(), collection, id));
+				System.exit(1);
 			} catch(WeaveException e) {
 				System.err.println(e.getMessage());
 				System.exit(1);
@@ -445,14 +661,17 @@ public class WeaveClient {
 			
 			try {
 				if ( id != null ) {
-					WeaveBasicObject wbo = weaveClient.getItem(collection, id);
+					WeaveBasicObject wbo = weaveClient.getItem(collection, id, encrypt);
 					System.out.print(wbo.getPayload());
 				} else {
-					WeaveBasicObject[] colWbo = weaveClient.getCollection(collection, null, null, null, null, null, null, null, null, null);
+					WeaveBasicObject[] colWbo = weaveClient.getCollection(collection, null, null, null, null, null, null, null, null, null, encrypt);
 					for (int i = 0; i < colWbo.length; i++) {
 						System.out.println(colWbo[i].getPayload().trim());
 					}	
 				}
+			} catch(NotFoundException e) {
+				System.err.println(String.format("Weave object not found - %s", e.getMessage()));
+				System.exit(1);				
 			} catch(WeaveException e) {
 				System.err.println(e.getMessage());
 				System.exit(1);

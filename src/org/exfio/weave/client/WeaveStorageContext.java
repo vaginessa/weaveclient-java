@@ -20,21 +20,23 @@ public abstract class WeaveStorageContext {
 	
 	public abstract WeaveClientParams getClientParams();
 
+	public abstract String generateWeaveID();
+
 	public abstract WeaveBasicObject decryptWeaveBasicObject(WeaveBasicObject wbo, String collection) throws WeaveException;
 
 	public abstract String decrypt(String payload, String collection) throws WeaveException;
 	
 	public abstract String encrypt(String plaintext, String collection) throws WeaveException;
 	
-	public abstract WeaveBasicObject get(String collection, String id, boolean decrypt) throws WeaveException;
+	public abstract WeaveBasicObject get(String collection, String id, boolean decrypt) throws WeaveException, NotFoundException;
 	
-	public WeaveBasicObject get(String collection, String id) throws WeaveException { return get(collection, id, true); }
+	public WeaveBasicObject get(String collection, String id) throws WeaveException, NotFoundException { return get(collection, id, true); }
 
-	public abstract String[] getCollectionIds(String collection, String[] ids, Double older, Double newer, Integer index_above, Integer index_below, Integer limit, Integer offset, String sort) throws WeaveException;
+	public abstract String[] getCollectionIds(String collection, String[] ids, Double older, Double newer, Integer index_above, Integer index_below, Integer limit, Integer offset, String sort) throws WeaveException, NotFoundException;
 
-	public abstract WeaveBasicObject[] getCollection(String collection, String[] ids, Double older, Double newer, Integer index_above, Integer index_below, Integer limit, Integer offset, String sort, String format, boolean decrypt) throws WeaveException;
+	public abstract WeaveBasicObject[] getCollection(String collection, String[] ids, Double older, Double newer, Integer index_above, Integer index_below, Integer limit, Integer offset, String sort, String format, boolean decrypt) throws WeaveException, NotFoundException;
 
-	public WeaveBasicObject[] getCollection(String collection, String[] ids, Double older, Double newer, Integer index_above, Integer index_below, Integer limit, Integer offset, String sort, String format) throws WeaveException {
+	public WeaveBasicObject[] getCollection(String collection, String[] ids, Double older, Double newer, Integer index_above, Integer index_below, Integer limit, Integer offset, String sort, String format) throws WeaveException, NotFoundException {
 		return getCollection(collection, ids, older, newer, index_above, index_below, limit, offset, sort, format, true);
 	}
 
@@ -46,5 +48,7 @@ public abstract class WeaveStorageContext {
 
 	public Double put(String collection, String id, WeaveBasicObject wbo) throws WeaveException { return put(collection, id, wbo, true); }
 
-	public abstract void delete(String collection, String id) throws WeaveException;
+	public abstract Double delete(String collection, String id) throws WeaveException, NotFoundException;
+
+	public abstract Double deleteCollection(String collection, String[] ids, Double older, Double newer, Integer limit, Integer offset, String sort) throws WeaveException, NotFoundException;
 }

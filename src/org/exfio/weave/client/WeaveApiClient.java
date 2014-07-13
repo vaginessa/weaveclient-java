@@ -57,17 +57,17 @@ public abstract class WeaveApiClient {
 
 	public Map<String, WeaveCollectionInfo> getInfoCollections() throws WeaveException { return getInfoCollections(false, false); }
 
-	public abstract WeaveBasicObject get(String collection, String id) throws WeaveException;
+	public abstract WeaveBasicObject get(String collection, String id) throws WeaveException, NotFoundException;
 	
-	public abstract WeaveBasicObject get(String path) throws WeaveException;
+	public abstract WeaveBasicObject get(String path) throws WeaveException, NotFoundException;
 
-	public abstract WeaveBasicObject get(URI location) throws WeaveException;
+	public abstract WeaveBasicObject get(URI location) throws WeaveException, NotFoundException;
 
-	public abstract String[] getCollectionIds(String collection, String[] ids, Double older, Double newer, Integer index_above, Integer index_below, Integer limit, Integer offset, String sort) throws WeaveException;
+	public abstract String[] getCollectionIds(String collection, String[] ids, Double older, Double newer, Integer index_above, Integer index_below, Integer limit, Integer offset, String sort) throws WeaveException, NotFoundException;
 
-	public abstract WeaveBasicObject[] getCollection(String collection, String[] ids, Double older, Double newer, Integer index_above, Integer index_below, Integer limit, Integer offset, String sort, String format) throws WeaveException;
+	public abstract WeaveBasicObject[] getCollection(String collection, String[] ids, Double older, Double newer, Integer index_above, Integer index_below, Integer limit, Integer offset, String sort, String format) throws WeaveException, NotFoundException;
 
-	public abstract WeaveBasicObject[] getCollection(URI location) throws WeaveException;
+	public abstract WeaveBasicObject[] getCollection(URI location) throws WeaveException, NotFoundException;
 
 	public abstract Double put(String collection, String id, WeaveBasicObject wbo) throws WeaveException;
 	
@@ -75,9 +75,12 @@ public abstract class WeaveApiClient {
 
 	public abstract Double put(URI location, WeaveBasicObject wbo) throws WeaveException;
 
-	public abstract void delete(String collection, String id) throws WeaveException;
+	public abstract Double delete(String collection, String id) throws WeaveException;
 	
-	public abstract void delete(URI location) throws WeaveException;
+	public abstract Double delete(URI location) throws WeaveException;
+	
+	public abstract Double deleteCollection(String collection, String[] ids, Double older, Double newer, Integer limit, Integer offset, String sort) throws WeaveException, NotFoundException;
+
 
 	public void lock() {
 		httpClient.lock();

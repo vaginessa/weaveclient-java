@@ -21,14 +21,25 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.HashMap;
 
+import javax.swing.text.html.parser.Entity;
+
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpHost;
+import org.apache.http.HttpResponse;
+import org.apache.http.HttpStatus;
 import org.apache.http.NameValuePair;
+import org.apache.http.StatusLine;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.client.AuthCache;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpDelete;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPut;
+import org.apache.http.client.methods.HttpUriRequest; 
 import org.apache.http.client.protocol.HttpClientContext;
 import org.apache.http.client.utils.URLEncodedUtils;
+import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.auth.BasicScheme;
 import org.apache.http.impl.client.BasicAuthCache;
 import org.apache.http.impl.client.BasicCredentialsProvider;
@@ -84,15 +95,29 @@ public class WeaveApiClientV1_1 extends WeaveApiClient {
 		//TODO - Support captcha
 		jobj.put("captcha-challenge", "");
 		jobj.put("captcha-response", "");
+		
+		HttpPut put = new HttpPut(location);
+		CloseableHttpResponse response = null;
 
 		try {
-			httpClient.put(location, jobj.toJSONString());
+			//Backwards compatible with android version of org.apache.http
+			StringEntity entityPut = new StringEntity(jobj.toJSONString());
+			entityPut.setContentType("text/plain");
+			entityPut.setContentEncoding("UTF-8");
+			
+			put.setEntity(entityPut);
+
+			response = httpClient.execute(put);
+			checkResponse(response);
+
 		} catch (IOException e) {
 			throw new WeaveException(e);
 		} catch (HttpException e) {
 			throw new WeaveException(e);
-		}
-		
+		} finally {
+			closeResponse(response);
+		} 
+
 		init(baseURL, user, password);
 		
 		return true;
@@ -110,18 +135,25 @@ public class WeaveApiClientV1_1 extends WeaveApiClient {
 		}
 
 		//TODO - confirm account exists, i.e. /user/1.1/USER returns 1
-		
 		//Get storageURL
-		URI location = this.baseURL.resolve(URIUtils.sanitize(String.format("/user/1.1/%s/node/weave", this.user)));		
+		URI location = this.baseURL.resolve(URIUtils.sanitize(String.format("/user/1.1/%s/node/weave", this.user)));
+		HttpGet get = new HttpGet(location);
+		CloseableHttpResponse response = null;
+
 		try {
-			HttpEntity entity = httpClient.get(location);
-			storageURL = new URI(EntityUtils.toString(entity)); 
+			response = httpClient.execute(get);
+			checkResponse(response);
+			
+			storageURL = new URI(EntityUtils.toString(response.getEntity()));
+
 		} catch (IOException e) {
 			throw new WeaveException(e);
 		} catch (HttpException e) {
 			throw new WeaveException(e);
-		} catch (URISyntaxException e) {  
-			throw new WeaveException(e);  
+		} catch (URISyntaxException e) {
+			throw new WeaveException(e);
+		} finally {
+			closeResponse(response);
 		}
 		
 		//Set HTTP Auth credentials
@@ -148,9 +180,13 @@ public class WeaveApiClientV1_1 extends WeaveApiClient {
 		JSONObject jsonObject = null;
 		
 		//Always get info/collections
-		location = this.storageURL.resolve(URIUtils.sanitize(String.format("/1.1/%s/info/collections", this.user)));			
-		jsonObject = getJSONPayload(location);
-
+		location = this.storageURL.resolve(URIUtils.sanitize(String.format("/1.1/%s/info/collections", this.user)));
+		try {
+			jsonObject = getJSONPayload(location);
+		} catch (NotFoundException e) {
+			throw new WeaveException("info/collections record not found - " + e.getMessage());
+		}
+			
 		@SuppressWarnings("unchecked")
 		Iterator<String> itCol = jsonObject.keySet().iterator();
 		while ( itCol.hasNext() ) {
@@ -163,7 +199,11 @@ public class WeaveApiClientV1_1 extends WeaveApiClient {
 		//Optionally get info/collection_counts
 		if ( getcount ) {
 			location = this.storageURL.resolve(URIUtils.sanitize(String.format("/1.1/%s/info/collection_counts", this.user)));			
-			jsonObject = getJSONPayload(location);
+			try {
+				jsonObject = getJSONPayload(location);
+			} catch (NotFoundException e) {
+				throw new WeaveException("info/collection_counts record not found - " + e.getMessage());
+			}
 	
 			@SuppressWarnings("unchecked")
 			Iterator<String> itQuota = jsonObject.keySet().iterator();
@@ -181,7 +221,11 @@ public class WeaveApiClientV1_1 extends WeaveApiClient {
 		//Optionally get info/collection_usage
 		if ( getusage ) {
 			location = this.storageURL.resolve(URIUtils.sanitize(String.format("/1.1/%s/info/collection_usage", this.user)));			
-			jsonObject = getJSONPayload(location);
+			try {
+				jsonObject = getJSONPayload(location);
+			} catch (NotFoundException e) {
+				throw new WeaveException("info/collection_usage record not found - " + e.getMessage());
+			}
 	
 			@SuppressWarnings("unchecked")
 			Iterator<String> itUsage = jsonObject.keySet().iterator();
@@ -199,17 +243,17 @@ public class WeaveApiClientV1_1 extends WeaveApiClient {
 		return wcols;
 	}
 	
-	public WeaveBasicObject get(String collection, String id) throws WeaveException {
+	public WeaveBasicObject get(String collection, String id) throws WeaveException, NotFoundException {
 		URI location = this.storageURL.resolve(URIUtils.sanitize(String.format("/1.1/%s/storage/%s/%s", this.user, collection, id)));			
 		return this.get(location);
 	}
 	
-	public WeaveBasicObject get(String path) throws WeaveException {
+	public WeaveBasicObject get(String path) throws WeaveException, NotFoundException {
 		URI location = this.storageURL.resolve(URIUtils.sanitize(String.format("/1.1/%s/storage/%s", this.user, path)));
 		return this.get(location);
 	}
 
-	public WeaveBasicObject get(URI location) throws WeaveException {
+	public WeaveBasicObject get(URI location) throws WeaveException, NotFoundException {
 		Log.getInstance().debug( "get()");
 		
 		JSONObject jsonObject = getJSONPayload(location);
@@ -229,23 +273,26 @@ public class WeaveApiClientV1_1 extends WeaveApiClient {
 		}
 	}
 
-	public JSONObject getJSONPayload(URI location) throws WeaveException {
+	public JSONObject getJSONPayload(URI location) throws WeaveException, NotFoundException {
 		return getJSONPayload(location, false);
 	}
 
 	@SuppressWarnings("unchecked")
-	public JSONObject getJSONPayload(URI location, boolean isArray) throws WeaveException {
+	public JSONObject getJSONPayload(URI location, boolean isArray) throws WeaveException, NotFoundException {
 		Log.getInstance().debug( "getJSONPayload()");
-		
+
 		JSONObject jsonObject = null;
 
-		//parse request content to extract JSON encoded object
+		HttpGet get = new HttpGet(location);
+		CloseableHttpResponse response = null;
+
 		try {
-
-			HttpEntity entity = httpClient.get(location);
-
+			response    = httpClient.execute(get);
+			checkResponse(response);
+			
+			//parse request content to extract JSON encoded WeaveBasicObject
 			JSONParser parser = new JSONParser();  
-			BufferedReader br = new BufferedReader(new InputStreamReader(entity.getContent()));
+			BufferedReader br = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
 			if ( isArray ) {
 				JSONArray jsonArray = (JSONArray)parser.parse(br);
 				jsonObject = new JSONObject();
@@ -256,10 +303,15 @@ public class WeaveApiClientV1_1 extends WeaveApiClient {
 
 		} catch (IOException e) {
 			throw new WeaveException(e);
+		} catch (NotFoundException e) {
+			//NotFoundException extends HttpException so we need to catch and re-throw
+			throw e;
 		} catch (HttpException e) {
 			throw new WeaveException(e);
 		} catch (ParseException e) {  
 			throw new WeaveException(e);  
+		} finally {
+			closeResponse(response);
 		}
 		
 		return jsonObject;
@@ -333,12 +385,12 @@ public class WeaveApiClientV1_1 extends WeaveApiClient {
 		return location;
 	}
 
-	public String[] getCollectionIds(String collection, String[] ids, Double older, Double newer, Integer index_above, Integer index_below, Integer limit, Integer offset, String sort) throws WeaveException {
+	public String[] getCollectionIds(String collection, String[] ids, Double older, Double newer, Integer index_above, Integer index_below, Integer limit, Integer offset, String sort) throws WeaveException, NotFoundException {
 		URI location = buildCollectionUri(collection, ids, older, newer, index_above, index_below, limit, offset, sort, null, false);
 		return getCollectionIds(location);	
 	}
 
-	public String[] getCollectionIds(URI location) throws WeaveException {
+	public String[] getCollectionIds(URI location) throws WeaveException, NotFoundException {
 		Log.getInstance().debug( "getCollectionIds()");
 		
 		List<String> ids = new LinkedList<String>();
@@ -361,12 +413,12 @@ public class WeaveApiClientV1_1 extends WeaveApiClient {
 		return ids.toArray(new String[0]);
 	}
 
-	public WeaveBasicObject[] getCollection(String collection, String[] ids, Double older, Double newer, Integer index_above, Integer index_below, Integer limit, Integer offset, String sort, String format) throws WeaveException {
+	public WeaveBasicObject[] getCollection(String collection, String[] ids, Double older, Double newer, Integer index_above, Integer index_below, Integer limit, Integer offset, String sort, String format) throws WeaveException, NotFoundException {
 		URI location = buildCollectionUri(collection, ids, older, newer, index_above, index_below, limit, offset, sort, format, true);
 		return getCollection(location);	
 	}
 		
-	public WeaveBasicObject[] getCollection(URI location) throws WeaveException {
+	public WeaveBasicObject[] getCollection(URI location) throws WeaveException, NotFoundException {
 		Log.getInstance().debug( "getCollection()");
 		
 		List<WeaveBasicObject> listWbo = new LinkedList<WeaveBasicObject>();
@@ -428,48 +480,115 @@ public class WeaveApiClientV1_1 extends WeaveApiClient {
 
 	public Double put(URI location, WeaveBasicObject wbo) throws WeaveException {
 		Log.getInstance().debug("put()");
-		
-		String content = encodeWeaveBasicObject(wbo);
-		
-		//parse request content to extract server modified time
-		Double modified = null;
-		try {
 
-			HttpEntity entity = httpClient.put(location, content);
-			modified = Double.parseDouble(EntityUtils.toString(entity)); 
+		Double modified = null;
+
+		HttpPut put = new HttpPut(location);
+		CloseableHttpResponse response = null;
+
+		try {
+			//Backwards compatible with android version of org.apache.http
+			StringEntity entityPut = new StringEntity(encodeWeaveBasicObject(wbo));
+			entityPut.setContentType("text/plain");
+			entityPut.setContentEncoding("UTF-8");
+			
+			put.setEntity(entityPut);
+
+			response = httpClient.execute(put);
+			checkResponse(response);
+
+			//parse request content to extract server modified time
+			modified = Double.parseDouble(EntityUtils.toString(response.getEntity()));
 
 		} catch (IOException e) {
 			throw new WeaveException(e);
 		} catch (HttpException e) {
 			throw new WeaveException(e);
-		}
+		} finally {
+			closeResponse(response);
+		} 
 		
 		return modified;
 	}
 
-	public void delete(String collection, String id) throws WeaveException {
+	public Double delete(String collection, String id) throws WeaveException {
 		URI location = null;
 		if (id == null) {
 			location = this.storageURL.resolve(URIUtils.sanitize(String.format("/1.1/%s/storage/%s", this.user, collection)));
 		} else {
 			location = this.storageURL.resolve(URIUtils.sanitize(String.format("/1.1/%s/storage/%s/%s", this.user, collection, id)));			
 		}
-		this.delete(location);
+		return this.delete(location);
 	}
 	
-	public void delete(URI location) throws WeaveException {
+	public Double delete(URI location) throws WeaveException {
 		Log.getInstance().debug( "get()");
+		
+		//parse request content to extract server modified time
+
+		HttpDelete del                 = null;
+		CloseableHttpResponse response = null;
+		Double modified                = null;
 		
 		try {
 
-			@SuppressWarnings("unused")
-			HttpEntity entity = httpClient.delete(location);
+			//@SuppressWarnings("unused")
+			//HttpEntity entity = httpClient.delete(location);
+			
+			del = new HttpDelete(location);
+			response = httpClient.execute(del);
+			checkResponse(response);
+			
+			modified = Double.parseDouble(EntityUtils.toString(response.getEntity()));
 
 		} catch (IOException e) {
 			throw new WeaveException(e);
 		} catch (HttpException e) {
 			throw new WeaveException(e);
-		}	
+		} finally {
+			closeResponse(response);
+		}
+		
+		return modified;
 	}
 
+	public Double deleteCollection(String collection, String[] ids, Double older, Double newer, Integer limit, Integer offset, String sort) throws WeaveException, NotFoundException {
+		URI location = buildCollectionUri(collection, ids, older, newer, null, null, limit, offset, sort, null, false);
+		return delete(location);
+	}
+
+	private static void closeResponse(CloseableHttpResponse response) {
+		if ( response == null ) {
+			return;
+		}
+		
+		try {
+			response.close();
+		} catch (Exception e) {
+			//fail quietly
+			Log.getInstance().error("Couldn't close HttpResponse - " + e.getMessage());
+		}
+	}
+	
+	private static void checkResponse(HttpResponse response) throws HttpException {
+		checkResponse(response.getStatusLine());
+	}
+	
+	private static void checkResponse(StatusLine statusLine) throws HttpException {
+		int code = statusLine.getStatusCode();
+		
+		if (code/100 == 1 || code/100 == 2)		// everything OK
+			return;
+		
+		String reason = code + " " + statusLine.getReasonPhrase();
+		switch (code) {
+		case HttpStatus.SC_NOT_FOUND:
+			throw new NotFoundException(reason);
+		case HttpStatus.SC_PRECONDITION_FAILED:
+			throw new PreconditionFailedException(reason);
+		default:
+			throw new HttpException(code, reason);
+		}
+	}
+	
 }

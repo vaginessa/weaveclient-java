@@ -1,0 +1,7 @@
+#!/bin/bash
+
+WEAVE_BINPATH=$(dirname $0)
+WEAVE_CLASSPATH="${WEAVE_BINPATH}/bin:${WEAVE_BINPATH}/libs/*:${WEAVE_BINPATH}/runtime-libs/*" 
+
+#echo "java -cp $WEAVE_CLASSPATH org.exfio.weave.client.WeaveClient $@"
+java -cp $WEAVE_CLASSPATH org.exfio.weave.ext.auth.Authorisation "$@"

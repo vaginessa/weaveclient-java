@@ -1,4 +1,4 @@
-package org.exfio.weave.client;
+package org.exfio.weave.crypto;
 
 public class WeaveKeyPair {
 	public byte[] cryptKey;
