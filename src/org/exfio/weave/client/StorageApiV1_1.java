@@ -1,13 +1,3 @@
-/*******************************************************************************
- * Copyright (c) 2014 Richard Hirner (bitfire web engineering).
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the GNU Public License v3.0
- * which accompanies this distribution, and is available at
- * http://www.gnu.org/licenses/gpl.html
- * 
- * Contributors:
- *     Richard Hirner (bitfire web engineering) - initial API and implementation
- ******************************************************************************/
 package org.exfio.weave.client;
 
 import java.net.URI;
@@ -21,9 +11,6 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.HashMap;
 
-import javax.swing.text.html.parser.Entity;
-
-import org.apache.http.HttpEntity;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
 import org.apache.http.HttpStatus;
@@ -36,7 +23,6 @@ import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPut;
-import org.apache.http.client.methods.HttpUriRequest; 
 import org.apache.http.client.protocol.HttpClientContext;
 import org.apache.http.client.utils.URLEncodedUtils;
 import org.apache.http.entity.StringEntity;
@@ -52,109 +38,32 @@ import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
 import org.exfio.weave.WeaveException;
-import org.exfio.weave.client.WeaveClient.ApiVersion;
+import org.exfio.weave.client.WeaveClientFactory.ApiVersion;
 import org.exfio.weave.net.HttpException;
 import org.exfio.weave.util.Log;
 import org.exfio.weave.util.URIUtils;
 
 
-public class WeaveApiClientV1_1 extends WeaveApiClient {
+public class StorageApiV1_1 extends StorageApi {
 		
-	private URI    baseURL;	
+	private URI storageURL;
 	private String user;
 	private String password;
 	
-	private URI storageURL;
 	
-	public WeaveApiClientV1_1() throws WeaveException {
+	public StorageApiV1_1() throws WeaveException {
 		super();
-		version  = ApiVersion.v1_1;
-		baseURL  = null;	
-		user     = null;
-		password = null;
+		version    = ApiVersion.v1_1;
+		storageURL = null;
+		user       = null;
+		password   = null;
 	}
 	
-	@SuppressWarnings("unchecked")
-	public boolean register(String baseURL, String user, String password, String email) throws WeaveException {
-		Log.getInstance().debug("register()");
-		
-		try {
-			this.baseURL  = new URI(baseURL);
-		} catch (URISyntaxException e) {
-			throw new WeaveException(e);
-		}
+	public void init(URI storageURL, String user, String password) throws WeaveException {
 
-		//Build registration URL
-		URI location = this.baseURL.resolve(URIUtils.sanitize(String.format("/user/1.1/%s", user)));
-				
-		//Build HTTP request content
-		JSONObject jobj = new JSONObject();
-		jobj.put("password", password);
-		jobj.put("email", email);
-		
-		//TODO - Support captcha
-		jobj.put("captcha-challenge", "");
-		jobj.put("captcha-response", "");
-		
-		HttpPut put = new HttpPut(location);
-		CloseableHttpResponse response = null;
-
-		try {
-			//Backwards compatible with android version of org.apache.http
-			StringEntity entityPut = new StringEntity(jobj.toJSONString());
-			entityPut.setContentType("text/plain");
-			entityPut.setContentEncoding("UTF-8");
-			
-			put.setEntity(entityPut);
-
-			response = httpClient.execute(put);
-			checkResponse(response);
-
-		} catch (IOException e) {
-			throw new WeaveException(e);
-		} catch (HttpException e) {
-			throw new WeaveException(e);
-		} finally {
-			closeResponse(response);
-		} 
-
-		init(baseURL, user, password);
-		
-		return true;
-	}
-
-	public void init(String baseURL, String user, String password) throws WeaveException {
-
-		this.user     = user;
-		this.password = password;
-
-		try {
-			this.baseURL  = new URI(baseURL);
-		} catch (URISyntaxException e) {
-			throw new WeaveException(e);
-		}
-
-		//TODO - confirm account exists, i.e. /user/1.1/USER returns 1
-		//Get storageURL
-		URI location = this.baseURL.resolve(URIUtils.sanitize(String.format("/user/1.1/%s/node/weave", this.user)));
-		HttpGet get = new HttpGet(location);
-		CloseableHttpResponse response = null;
-
-		try {
-			response = httpClient.execute(get);
-			checkResponse(response);
-			
-			storageURL = new URI(EntityUtils.toString(response.getEntity()));
-
-		} catch (IOException e) {
-			throw new WeaveException(e);
-		} catch (HttpException e) {
-			throw new WeaveException(e);
-		} catch (URISyntaxException e) {
-			throw new WeaveException(e);
-		} finally {
-			closeResponse(response);
-		}
+		this.storageURL = storageURL;
+		this.user       = user;
+		this.password   = password;
 		
 		//Set HTTP Auth credentials
 		HttpClientContext context = HttpClientContext.create();

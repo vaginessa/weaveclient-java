@@ -1,12 +1,13 @@
 /*******************************************************************************
- * Copyright (c) 2014 Richard Hirner (bitfire web engineering).
+ * Copyright (c) 2014 Gerry Healy <nickel_chrome@mac.com>
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the GNU Public License v3.0
  * which accompanies this distribution, and is available at
  * http://www.gnu.org/licenses/gpl.html
  * 
  * Contributors:
- *     Richard Hirner (bitfire web engineering) - initial API and implementation
+ *     Gerry Healy <nickel_chrome@mac.com> - Initial implementation
+ *     Richard Hirner (bitfire web engineering) - based on DAVDroid
  ******************************************************************************/
 package org.exfio.weave.net;
 
@@ -39,7 +40,6 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.ManagedHttpClientConnectionFactory;
 //import org.apache.http.impl.conn.ManagedHttpClientConnectionFactory;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
-
 import org.exfio.weave.Constants;
 import org.exfio.weave.client.NotFoundException;
 import org.exfio.weave.client.PreconditionFailedException;
@@ -75,53 +75,11 @@ public class HttpClient {
 			httpClientLock.writeLock().unlock();
 		}
 
-		/*
-		//Default to org.apache.http.ssl.SSLConnectionSocketFactory
-		if ( sslSocketFactory == null ) {
-			sslSocketFactory = SSLConnectionSocketFactory.getSocketFactory();
-		}
-		
-		RequestConfig defaultRqConfig;
-		Registry<ConnectionSocketFactory> socketFactoryRegistry;
-
-		socketFactoryRegistry =	RegistryBuilder.<ConnectionSocketFactory> create()
-				.register("http", PlainConnectionSocketFactory.getSocketFactory())
-				.register("https", sslSocketFactory)
-				.build();
-		
-		// use request defaults from AndroidHttpClient
-		defaultRqConfig = RequestConfig.copy(RequestConfig.DEFAULT)
-				.setConnectTimeout(20*1000)
-				.setSocketTimeout(20*1000)
-				.setStaleConnectionCheckEnabled(false)
-				.build();
-		
-		// enable logging
-		//ManagedHttpClientConnectionFactory.INSTANCE.wirelog.enableDebug(true);
-		//ManagedHttpClientConnectionFactory.INSTANCE.log.enableDebug(true);
-
-		PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager(socketFactoryRegistry);
-		// limits per DavHttpClient (= per DavSyncAdapter extends AbstractThreadedSyncAdapter)
-		connectionManager.setMaxTotal(2);				// max.  2 connections in total
-		connectionManager.setDefaultMaxPerRoute(2);		// max.  2 connections per host
-		
-		httpClient = HttpClients.custom()
-				.useSystemProperties()
-				.setConnectionManager(connectionManager)
-				.setDefaultRequestConfig(defaultRqConfig)
-				//.setRetryHandler(WeaveHttpRequestRetryHandler.getInstance())
-				.setUserAgent(userAgent)
-				.disableCookieManagement()
-				.build();
-		 */
-
 		httpClient = HttpClients.custom()
 				.setRetryHandler(HttpRequestRetryHandler.INSTANCE)
 				.setUserAgent(userAgent)
 				.build();
 		
-		//httpClient = HttpClients.createDefault();
-
 		httpClientLock = new ReentrantReadWriteLock();
 
 		context = HttpClientContext.create();
@@ -144,6 +102,44 @@ public class HttpClient {
 		HttpClient.userAgent = userAgent;
 	}
 
+	
+	//---------------------------------
+	// Static (helper) methods
+	//---------------------------------
+
+	public static void closeResponse(CloseableHttpResponse response) {
+		if ( response == null ) {
+			return;
+		}
+		
+		try {
+			response.close();
+		} catch (Exception e) {
+			//fail quietly
+			Log.getInstance().error("Couldn't close HttpResponse - " + e.getMessage());
+		}
+	}
+	
+	public static void checkResponse(HttpResponse response) throws HttpException {
+		checkResponse(response.getStatusLine());
+	}
+	
+	public static void checkResponse(StatusLine statusLine) throws HttpException {
+		int code = statusLine.getStatusCode();
+		
+		if (code/100 == 1 || code/100 == 2)		// everything OK
+			return;
+		
+		String reason = code + " " + statusLine.getReasonPhrase();
+		switch (code) {
+		case HttpStatus.SC_NOT_FOUND:
+			throw new NotFoundException(reason);
+		case HttpStatus.SC_PRECONDITION_FAILED:
+			throw new PreconditionFailedException(reason);
+		default:
+			throw new HttpException(code, reason);
+		}
+	}
 	
 	//---------------------------------
 	// Instance (post-initialisation) methods

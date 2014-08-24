@@ -15,28 +15,21 @@ import org.json.simple.parser.ParseException;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
-import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.Cipher;
-import javax.crypto.NoSuchPaddingException;
-import javax.crypto.BadPaddingException;
-import javax.crypto.IllegalBlockSizeException;
 
 import java.security.NoSuchAlgorithmException;
-import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 
 import org.exfio.weave.Constants;
 import org.exfio.weave.WeaveException;
-import org.exfio.weave.client.WeaveClient.ApiVersion;
-import org.exfio.weave.client.WeaveClient.StorageVersion;
-import org.exfio.weave.client.WeaveClientParams;
+import org.exfio.weave.client.WeaveClientFactory.StorageVersion;
+import org.exfio.weave.client.AccountParams;
 import org.exfio.weave.crypto.PayloadCipher;
 import org.exfio.weave.crypto.WeaveKeyPair;
 import org.exfio.weave.util.Log;
 import org.exfio.weave.util.Hex;
 import org.exfio.weave.util.Base64;
 
-public class WeaveStorageV5 extends WeaveStorageContext {
+public class WeaveClientV5 extends WeaveClient {
 	
 	public static final String KEY_CRYPTO_PATH       = "crypto/keys";
 	public static final String KEY_CRYPTO_COLLECTION = "crypto";
@@ -45,43 +38,61 @@ public class WeaveStorageV5 extends WeaveStorageContext {
 	public static final String KEY_META_COLLECTION   = "meta";
 	public static final String KEY_META_ID           = "global";
 	
-	private WeaveApiClient weaveApiClient;
+	private StorageApi storageClient;
+	private AccountApi regClient;
 	private String user;
 	private String syncKey;
 	private WeaveKeyPair privateKey;
 	private Map<String, WeaveKeyPair> bulkKeys;
 
-	public WeaveStorageV5() {
+	public WeaveClientV5() {
 		super();
 		version        = StorageVersion.v5;
-		weaveApiClient = null;
+		storageClient  = null;
+		regClient      = null;
 		user           = null;
 		syncKey        = null;
 		privateKey     = null;
 		bulkKeys       = null;
 	}
 
-	public void register(WeaveClientParams params) throws WeaveException {
-		WeaveRegistrationParams p = (WeaveRegistrationParams)params;
+	public AccountParams register(AccountParams params) throws WeaveException {
+		RegistrationParams p = (RegistrationParams)params;
 		register(p.baseURL, p.user, p.password, p.email);
+		
+		WeaveClientV5Params pnew = new WeaveClientV5Params();
+		pnew.baseURL = p.baseURL;
+		pnew.user    = p.user;
+		pnew.syncKey = syncKey;
+		
+		return pnew;
 	}
 
 	public void register(String baseURL, String user, String password, String email) throws WeaveException {
-		register(baseURL, user, password, email, WeaveClient.ApiVersion.v1_1);		
+		register(baseURL, user, password, email, WeaveClientFactory.ApiVersion.v1_1);		
 	}
 
-	public void register(String baseURL, String user, String password, String email, WeaveClient.ApiVersion apiVersion) throws WeaveException {
-		this.weaveApiClient = WeaveApiClient.getInstance(apiVersion);
-		this.weaveApiClient.register(baseURL, user, password, email);
+	@SuppressWarnings("unchecked")
+	public void register(String baseURL, String user, String password, String email, WeaveClientFactory.ApiVersion apiVersion) throws WeaveException {
 		this.user            = user;
 		this.syncKey         = null;
 		this.privateKey      = null;
 		this.bulkKeys        = null;
+
+		//TODO - handle captcha
 		
+		//Register new account
+		regClient = new RegistrationApiV1_0();
+		regClient.register(baseURL, user, password, email);
+				
+		//Initialise storage client with account details
+		storageClient = new StorageApiV1_1();
+		storageClient.init(regClient.getStorageUrl(), user, password);
+
 		//1. Build and publish meta/global WBO
 		JSONObject metaObject = new JSONObject();
 		metaObject.put("syncID", generateWeaveID());
-		metaObject.put("storageVersion", WeaveClient.storageVersionToString(this.getStorageVersion()));
+		metaObject.put("storageVersion", WeaveClientFactory.storageVersionToString(this.getStorageVersion()));
 		metaObject.put("engines", new JSONObject());
 
 		WeaveBasicObject wboMeta = new WeaveBasicObject(KEY_META_ID, null, null, null, metaObject.toJSONString());
@@ -122,37 +133,41 @@ public class WeaveStorageV5 extends WeaveStorageContext {
 		//Encrypt payload with private keypair
 		wboCrypto = encryptWeaveBasicObject(wboCrypto, null);
 
-		weaveApiClient.put(KEY_CRYPTO_PATH, wboCrypto);
+		storageClient.put(KEY_CRYPTO_PATH, wboCrypto);
 	}
 
-	public void init(WeaveClientParams params) throws WeaveException {
-		WeaveStorageV5Params p = (WeaveStorageV5Params)params;
+	public void init(AccountParams params) throws WeaveException {
+		WeaveClientV5Params p = (WeaveClientV5Params)params;
 		init(p.baseURL, p.user, p.password, p.syncKey);
 	}
 
 	public void init(String baseURL, String user, String password, String syncKey) throws WeaveException {
-		init(baseURL, user, password, syncKey, WeaveClient.ApiVersion.v1_1);
+		init(baseURL, user, password, syncKey, WeaveClientFactory.ApiVersion.v1_1);
 	}
 
-	public void init(String baseURL, String user, String password, String syncKey, WeaveClient.ApiVersion apiVersion) throws WeaveException {
-		this.weaveApiClient = WeaveApiClient.getInstance(apiVersion);
-		this.weaveApiClient.init(baseURL, user, password);
+	public void init(String baseURL, String user, String password, String syncKey, WeaveClientFactory.ApiVersion apiVersion) throws WeaveException {
 		this.user            = user;
 		this.syncKey         = syncKey;
 		this.privateKey      = null;
 		this.bulkKeys        = null;
+		
+		//Initialise registration and storage clients with account details
+		regClient = new RegistrationApiV1_0();
+		regClient.init(baseURL, user, password);
+		storageClient = new StorageApiV1_1();
+		storageClient.init(regClient.getStorageUrl(), user, password);
 	}
 
-	public WeaveApiClient getApiClient() {
-		return weaveApiClient;
+	public StorageApi getApiClient() {
+		return storageClient;
 	}
 	
-	public void setApiClient(WeaveApiClient weaveApiClient) {
-		this.weaveApiClient = weaveApiClient;
+	public void setApiClient(StorageApi weaveApiClient) {
+		this.storageClient = weaveApiClient;
 	}
 
-	public WeaveClientParams getClientParams() {
-		WeaveStorageV5Params params = new WeaveStorageV5Params();
+	public AccountParams getClientParams() {
+		WeaveClientV5Params params = new WeaveClientV5Params();
 		params.baseURL  = null; //FIXME - get from API client
 		params.user     = this.user;
 		params.password = null;
@@ -246,7 +261,7 @@ public class WeaveStorageV5 extends WeaveStorageContext {
 
             WeaveBasicObject res = null;
             try {
-            	res = weaveApiClient.get(KEY_CRYPTO_PATH);
+            	res = storageClient.get(KEY_CRYPTO_PATH);
             } catch (NotFoundException e) {
             	throw new WeaveException(KEY_CRYPTO_PATH + " not found " + e.getMessage());
             }
@@ -356,7 +371,6 @@ public class WeaveStorageV5 extends WeaveStorageContext {
 	 *
 	 * Given a plaintext object, encrypt it and return the ciphertext value.
 	 */
-	@SuppressWarnings("unchecked")
 	public String encrypt(String plaintext, String collection) throws WeaveException {		
 		Log.getInstance().debug( "encrypt()");
 		Log.getInstance().debug( "plaintext:\n" + plaintext);
@@ -393,7 +407,7 @@ public class WeaveStorageV5 extends WeaveStorageContext {
 	}
 	
 	public WeaveBasicObject get(String collection, String id, boolean decrypt) throws WeaveException, NotFoundException {
-		WeaveBasicObject wbo = this.weaveApiClient.get(collection, id);
+		WeaveBasicObject wbo = this.storageClient.get(collection, id);
 		if ( decrypt ) {
 			try {
 				if ( isEncrypted(wbo) ) {
@@ -409,11 +423,11 @@ public class WeaveStorageV5 extends WeaveStorageContext {
 	}
 
 	public String[] getCollectionIds(String collection, String[] ids, Double older, Double newer, Integer index_above, Integer index_below, Integer limit, Integer offset, String sort) throws WeaveException, NotFoundException {
-		return this.weaveApiClient.getCollectionIds(collection, ids, older, newer, index_above, index_below, limit, offset, sort);
+		return this.storageClient.getCollectionIds(collection, ids, older, newer, index_above, index_below, limit, offset, sort);
 	}
 
 	public WeaveBasicObject[] getCollection(String collection, String[] ids, Double older, Double newer, Integer index_above, Integer index_below, Integer limit, Integer offset, String sort, String format, boolean decrypt) throws WeaveException, NotFoundException {
-		WeaveBasicObject[] colWbo = this.weaveApiClient.getCollection(collection, ids, older, newer, index_above, index_below, limit, offset, sort, format);
+		WeaveBasicObject[] colWbo = this.storageClient.getCollection(collection, ids, older, newer, index_above, index_below, limit, offset, sort, format);
 		if ( decrypt ) {
 			try {
 				for (int i = 0; i < colWbo.length; i++) {
@@ -431,7 +445,7 @@ public class WeaveStorageV5 extends WeaveStorageContext {
 	}
 
 	public WeaveCollectionInfo getCollectionInfo(String collection, boolean getcount, boolean getusage) throws WeaveException {
-		Map<String, WeaveCollectionInfo> wcols = this.weaveApiClient.getInfoCollections(getcount, getusage);
+		Map<String, WeaveCollectionInfo> wcols = this.storageClient.getInfoCollections(getcount, getusage);
 		if ( !wcols.containsKey(collection) ) {
 			throw new WeaveException(String.format("Collection '%s' not found", collection));
 		}
@@ -450,15 +464,15 @@ public class WeaveStorageV5 extends WeaveStorageContext {
 				throw new WeaveException(e);
 			}
 		}
-		return this.weaveApiClient.put(collection, id, wbo);
+		return this.storageClient.put(collection, id, wbo);
 	}
 
 	public Double delete(String collection, String id) throws WeaveException {
-		return this.weaveApiClient.delete(collection, id);
+		return this.storageClient.delete(collection, id);
 	}
 
 	public Double deleteCollection(String collection, String[] ids, Double older, Double newer, Integer limit, Integer offset, String sort) throws WeaveException, NotFoundException {
-		return this.weaveApiClient.deleteCollection(collection, ids, older, newer, limit, offset, sort);
+		return this.storageClient.deleteCollection(collection, ids, older, newer, limit, offset, sort);
 	}
 
 }

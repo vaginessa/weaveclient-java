@@ -1,13 +1,15 @@
 package org.exfio.weave.client;
 
-import org.exfio.weave.client.WeaveClient.StorageVersion;
+import org.exfio.weave.client.WeaveClientFactory.StorageVersion;
 
-public class WeaveBasicParams implements WeaveClientParams {
+public class AccountParams {
+	protected StorageVersion version = null;
+	
 	public String baseURL;
 	public String user;
 	public String password;
 	
 	public StorageVersion getStorageVersion() {
-		return null;
+		return version;
 	}
 }

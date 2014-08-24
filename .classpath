@@ -19,5 +19,6 @@
 	<classpathentry kind="lib" path="libs/bcprov-jdk15on-150.jar"/>
 	<classpathentry kind="lib" path="libs/commons-cli-1.2.jar"/>
 	<classpathentry kind="lib" path="libs/lombok-api.jar"/>
+	<classpathentry kind="lib" path="libs/sqlite-jdbc-3.7.15-M1.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

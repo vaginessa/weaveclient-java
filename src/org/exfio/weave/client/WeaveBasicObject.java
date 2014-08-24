@@ -1,21 +1,27 @@
 package org.exfio.weave.client;
 
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
-import lombok.ToString;
+import lombok.Setter;
+import lombok.AccessLevel;
 
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
-@ToString
+
+@Data
 public class WeaveBasicObject {
-	@Getter protected String id;
-	@Getter protected Double modified;
-	@Getter protected Long sortindex;
-	@Getter protected Long ttl;
-	@Getter protected String payload;
+	protected String id;
+	protected Double modified;
+	protected Long sortindex;
+	protected Long ttl;
+	protected String payload;
 	
+	@Getter(AccessLevel.NONE)
+	@Setter(AccessLevel.NONE)
 	protected JSONObject jsonPayload;
 	
 	public WeaveBasicObject(String id) {

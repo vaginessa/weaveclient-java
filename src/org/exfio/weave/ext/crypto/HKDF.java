@@ -18,10 +18,8 @@ package org.exfio.weave.ext.crypto;
 
 
 import java.io.ByteArrayOutputStream;
-import java.math.BigInteger;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
-import java.util.List;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;

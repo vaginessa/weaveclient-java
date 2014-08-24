@@ -16,14 +16,14 @@ import java.util.Map;
 
 import org.exfio.weave.WeaveException;
 import org.exfio.weave.net.HttpClient;
-import org.exfio.weave.client.WeaveClient.ApiVersion;
+import org.exfio.weave.client.WeaveClientFactory.ApiVersion;
 
-public abstract class WeaveApiClient {
+public abstract class StorageApi {
 	
 	protected HttpClient httpClient = null;
 	protected ApiVersion version    = null;
 	
-	public WeaveApiClient() throws WeaveException {
+	public StorageApi() throws WeaveException {
 		try {
 			httpClient = HttpClient.getInstance();
 		} catch (IOException e) {
@@ -31,27 +31,9 @@ public abstract class WeaveApiClient {
 		}
 	}
 	
-	public static final WeaveApiClient getInstance(ApiVersion apiVersion) throws WeaveException {
-		//return WeaveClient for given storage context
-
-		WeaveApiClient apiClient = null;
-		
-		switch(apiVersion) {
-		case v1_1:
-			apiClient  = new WeaveApiClientV1_1();
-			break;
-		default:
-			throw new WeaveException(String.format("Weave API version '%s' not recognised", apiVersion));
-		}
-		
-		return apiClient;
-	}
-
 	public ApiVersion getApiVersion() { return version; }
 	
-	public abstract boolean register(String baseURL, String user, String password, String email) throws WeaveException;
-
-	public abstract void init(String baseURL, String user, String password) throws WeaveException;
+	public abstract void init(URI storageURL, String user, String password) throws WeaveException;
 				
 	public abstract Map<String, WeaveCollectionInfo> getInfoCollections(boolean getcount, boolean getinfo) throws WeaveException;
 
