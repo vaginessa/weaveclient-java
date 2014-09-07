@@ -47,6 +47,7 @@ public class CommsApiV1 {
 	public static final String KEY_MESSAGE_COLLECTION           = "exfiomessage";
 	public static final String KEY_MESSAGE_VERSION              = "version";
 	public static final String KEY_MESSAGE_SOURCE_CLIENTID      = "aclientid";
+	public static final String KEY_MESSAGE_SOURCE_IDENTITY_KEY  = "aidentitykey";
 	public static final String KEY_MESSAGE_SOURCE_KEYID         = "akeyid";
 	public static final String KEY_MESSAGE_SOURCE_KEY           = "akey";
 	public static final String KEY_MESSAGE_DESTINATION_CLIENTID = "bclientid";
@@ -131,8 +132,8 @@ public class CommsApiV1 {
 			JSONObject ekey = iter.next();
 			EphemeralKey clientKey = new EphemeralKey();
 			clientKey.setKeyId((String)ekey.get(KEY_CRYPTOKEY_KEYID));
-			clientKey.setKeyId((String)ekey.get(KEY_CRYPTOKEY_KEY));
-			clientKey.setKeyId("published");
+			clientKey.setPublicKey((String)ekey.get(KEY_CRYPTOKEY_KEY));
+			clientKey.setStatus("published");
 			clientKeys.add(clientKey);
 		}
 		client.setEphemeralKeys(clientKeys);
@@ -156,6 +157,9 @@ public class CommsApiV1 {
 		//Build message payload
 		msgObject.put(KEY_MESSAGE_VERSION, PROTO_MESSAGE_VERSION);
 		msgObject.put(KEY_MESSAGE_SOURCE_CLIENTID, msg.getSourceClientId());
+		if ( msg.getSourceIdentityKey() != null ) {
+			msgObject.put(KEY_MESSAGE_SOURCE_IDENTITY_KEY, msg.getSourceIdentityKey());
+		}
 		msgObject.put(KEY_MESSAGE_SOURCE_KEYID, msg.getSourceKeyId());
 		msgObject.put(KEY_MESSAGE_SOURCE_KEY, msg.getSourceKey());
 		msgObject.put(KEY_MESSAGE_DESTINATION_CLIENTID, msg.getDestinationClientId());
@@ -179,12 +183,15 @@ public class CommsApiV1 {
 		
 		msg.setVersion((String)payload.get(KEY_MESSAGE_VERSION));
 		msg.setSourceClientId((String)payload.get(KEY_MESSAGE_SOURCE_CLIENTID));
+		if ( payload.containsKey(KEY_MESSAGE_SOURCE_IDENTITY_KEY) ) {
+			msg.setSourceIdentityKey((String)payload.get(KEY_MESSAGE_SOURCE_IDENTITY_KEY));
+		}
 		msg.setSourceKeyId((String)payload.get(KEY_MESSAGE_SOURCE_KEYID));
 		msg.setSourceKey((String)payload.get(KEY_MESSAGE_SOURCE_KEY));
 		msg.setDestinationClientId((String)payload.get(KEY_MESSAGE_DESTINATION_CLIENTID));
 		msg.setDestinationKeyId((String)payload.get(KEY_MESSAGE_DESTINATION_KEYID));
 		msg.setMessageType((String)payload.get(KEY_MESSAGE_TYPE));
-		msg.setSequence((Integer)payload.get(KEY_MESSAGE_SEQUENCE));
+		msg.setSequence((Long)payload.get(KEY_MESSAGE_SEQUENCE));
 		msg.setContent((String)payload.get(KEY_MESSAGE_CONTENT));
 		
 		return msg;
@@ -354,7 +361,7 @@ public class CommsApiV1 {
 
 	public Client getClient(String clientId) throws WeaveException, NotFoundException {
 		try {
-			WeaveBasicObject wbo = wc.get(KEY_CLIENT_COLLECTION, clientId);
+			WeaveBasicObject wbo = wc.get(KEY_CLIENT_COLLECTION, clientId, false);
 			return decodeClientWeavePayload(wbo.getPayloadAsJSONObject());
 		} catch (ParseException e) {
 			throw new WeaveException(e);
@@ -396,7 +403,7 @@ public class CommsApiV1 {
 	
 	public EncodedMessage getMessage(String keyId) throws WeaveException, NotFoundException {
 		try {
-			WeaveBasicObject wbo = wc.get(KEY_MESSAGE_COLLECTION, keyId);
+			WeaveBasicObject wbo = wc.get(KEY_MESSAGE_COLLECTION, keyId, false);
 			EncodedMessage msg = decodeMessageWeavePayload(wbo.getPayloadAsJSONObject());
 			//Assume this is an incoming message
 			msg.setSession(getIncomingMessageSession(msg));
@@ -413,7 +420,7 @@ public class CommsApiV1 {
 	public Double putMessage(EncodedMessage msg) throws WeaveException {
 		JSONObject payloadClient = encodeMessageWeavePayload(msg);
 		WeaveBasicObject wbo = new WeaveBasicObject(msg.getDestinationKeyId(), null, null, null, payloadClient.toJSONString());		
-		return wc.put(KEY_CLIENT_COLLECTION, msg.getDestinationKeyId(), wbo, false);
+		return wc.put(KEY_MESSAGE_COLLECTION, msg.getDestinationKeyId(), wbo, false);
 	}
 
 	public Double deleteMessage(String keyId) throws WeaveException, NotFoundException {

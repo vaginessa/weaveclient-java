@@ -1,5 +1,6 @@
 package org.exfio.weave.ext.clientauth;
 
+import java.io.File;
 import java.lang.AssertionError;
 import java.lang.Math;
 import java.security.SecureRandom;
@@ -144,10 +145,26 @@ public class ClientAuth {
 	public void authoriseClient(String clientName, String password, String database) throws WeaveException {
 		Log.getInstance().debug("authoriseClient()");
 
-		//FIXME - Warn user if client has already been initialised
+		//TODO - Warn user if client has already been initialised
+		File dbPath = new File(database);
+		if ( dbPath.exists() ) {
+			Log.getInstance().warn(String.format("Database '%s' already exists", database));
+			
+			//Connect to database and update client record
+			try {
+				Connection jdbcDb = DriverManager.getConnection("jdbc:sqlite:" + database);
+				init(wc, jdbcDb);
+			} catch (SQLException e) {
+				throw new WeaveException("Couldn't initalise database connection - " + e.getMessage());
+			}
+			comms.updateClient();
+			
+		} else {
+			
+			//Initialise database and create client record
+			comms.initClient(clientName, isAuthorised(), database);
+		}
 		
-		//Initialise database and create client record
-		comms.initClient(clientName, isAuthorised(), database);
 		db = comms.getDB();
 		
 		//Generate and store auth code
@@ -210,7 +227,7 @@ public class ClientAuth {
 		}		
 	}
 
-	public void processClientAuthMessages() throws WeaveException {
+	public Message[] processClientAuthMessages() throws WeaveException {
 		Log.getInstance().debug("processClientAuthMessages()");
 
 		comms.checkMessages();
@@ -224,6 +241,12 @@ public class ClientAuth {
 				processClientAuthResponse(new ClientAuthResponseMessage(msgs[i]));	
 			}
 		}
+		
+		msgs = comms.getPendingMessages(MESSAGE_TYPE_CLIENTAUTHREQUEST);
+		for (int i = 0; i < msgs.length; i++) {
+			msgs[i] = new ClientAuthRequestMessage(msgs[i]);
+		}
+		return msgs;
 	}
 
 	public void processClientAuthResponse(ClientAuthResponseMessage msg) throws WeaveException {
@@ -309,17 +332,10 @@ public class ClientAuth {
 			comms.updateMessage(msg.getMessageId(), true, false);
 			return;
 		}
-		
-		caSession.setState("responsepending");
-		try {
-			CommsStorage.updateMessageSession(db, caSession.getSessionId(), "closed");
-		} catch (SQLException e) {
-			throw new WeaveException(String.format("Couldn't update client auth session '%s'", msg.getMessageSessionId()));
-		}
+
+		//Set message to read
 		comms.updateMessage(msg.getMessageId(), true, false);
 						
-		//FIXME Prompt user to authorise client
-		
 	}
 
 
@@ -334,7 +350,7 @@ public class ClientAuth {
 		
 		Message[] sessMsgs = null;
 		try {
-			sessMsgs = comms.getMessages(sessionId);
+			sessMsgs = comms.getMessagesBySession(sessionId);
 		} catch (NotFoundException e) {
 			throw new WeaveException(String.format("Couldn't get messages for session '%s'", sessionId));
 		}

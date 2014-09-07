@@ -20,7 +20,7 @@ public abstract class Message {
 	protected String destinationClientId;
 	protected String destinationKeyId;
 	protected String version;
-	protected int    sequence;
+	protected long   sequence;
 	protected String messageType;
 	protected Date   modifiedDate;
 

@@ -63,15 +63,7 @@ public class ClientAuthRequestMessage extends Message {
 		clientName = (String)caObject.get(KEY_CLIENTAUTH_REQUEST_NAME);
 		
 		//Authentication verifier
-		String authString = (String)caObject.get(KEY_CLIENTAUTH_REQUEST_AUTH);
-		
-		JSONObject authObject = null;
-		try {
-			JSONParser parser = new JSONParser();
-			authObject = (JSONObject)parser.parse(authString);
-		} catch (ParseException e) {
-			throw new WeaveException(e);
-		}
+		JSONObject authObject = (JSONObject)caObject.get(KEY_CLIENTAUTH_REQUEST_AUTH);
 		
 		auth = new ClientAuthVerifier();
 		auth.setInnerSalt((String)authObject.get(KEY_AUTH_INNERSALT));

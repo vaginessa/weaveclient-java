@@ -19,6 +19,7 @@ import org.exfio.weave.client.WeaveClientFactory;
 import org.exfio.weave.client.AccountParams;
 import org.exfio.weave.client.WeaveClientV5Params;
 import org.exfio.weave.ext.clientauth.ClientAuth;
+import org.exfio.weave.ext.comm.Message;
 import org.exfio.weave.util.Log;
 
 public class ClientAuthCLI {
@@ -272,12 +273,19 @@ public class ClientAuthCLI {
 
 			Log.getInstance().info(String.format("Checking messages"));
 
+			Message[] caMsgs = null;
+			
 			try {			
 				ClientAuth auth = new ClientAuth(weaveClient, clientDatabase.getPath());
-				auth.processClientAuthMessages();
+				caMsgs = auth.processClientAuthMessages();
 			} catch(WeaveException e) {
 				System.err.println(e.getMessage());
 				System.exit(1);
+			}
+			
+			for (int i = 0; i < caMsgs.length; i++) {
+				ClientAuthRequestMessage caMsg = (ClientAuthRequestMessage)caMsgs[i];
+				System.out.println(String.format("Client auth request received from '%s'", caMsg.getClientName()));
 			}
 			
 			System.exit(0);

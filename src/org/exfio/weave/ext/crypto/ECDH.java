@@ -45,11 +45,11 @@ public class ECDH {
 				Class<?> provider = Class.forName(cryptoProviderClass);
 				Security.addProvider((Provider)provider.newInstance());
 			} catch (ClassNotFoundException e) {
-				new AssertionError(e);
+				throw new AssertionError(e);
 			} catch (IllegalAccessException e) {
-				new AssertionError(e);
+				throw new AssertionError(e);
 			} catch (InstantiationException  e) {
-				new AssertionError(e);				
+				throw new AssertionError(e);				
 			}
 		}
 		return cryptoProvider;

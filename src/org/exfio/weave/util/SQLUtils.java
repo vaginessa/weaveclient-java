@@ -50,7 +50,7 @@ public class SQLUtils {
 		try {
 		    dt = df.parse(datetime);
 		} catch (ParseException e) {
-		   new AssertionError(e.getMessage());
+		   throw new AssertionError(e.getMessage());
 		}
 		return dt;
 	}
