@@ -89,7 +89,7 @@ public class StorageApiV1_1 extends StorageApi {
 		JSONObject jsonObject = null;
 		
 		//Always get info/collections
-		location = this.storageURL.resolve(URIUtils.sanitize(String.format("/1.1/%s/info/collections", this.user)));
+		location = this.storageURL.resolve(URIUtils.sanitize(String.format("1.1/%s/info/collections", this.user)));
 		try {
 			jsonObject = getJSONPayload(location);
 		} catch (NotFoundException e) {
@@ -107,7 +107,7 @@ public class StorageApiV1_1 extends StorageApi {
 
 		//Optionally get info/collection_counts
 		if ( getcount ) {
-			location = this.storageURL.resolve(URIUtils.sanitize(String.format("/1.1/%s/info/collection_counts", this.user)));			
+			location = this.storageURL.resolve(URIUtils.sanitize(String.format("1.1/%s/info/collection_counts", this.user)));			
 			try {
 				jsonObject = getJSONPayload(location);
 			} catch (NotFoundException e) {
@@ -129,7 +129,7 @@ public class StorageApiV1_1 extends StorageApi {
 		
 		//Optionally get info/collection_usage
 		if ( getusage ) {
-			location = this.storageURL.resolve(URIUtils.sanitize(String.format("/1.1/%s/info/collection_usage", this.user)));			
+			location = this.storageURL.resolve(URIUtils.sanitize(String.format("1.1/%s/info/collection_usage", this.user)));			
 			try {
 				jsonObject = getJSONPayload(location);
 			} catch (NotFoundException e) {
@@ -153,12 +153,12 @@ public class StorageApiV1_1 extends StorageApi {
 	}
 	
 	public WeaveBasicObject get(String collection, String id) throws WeaveException, NotFoundException {
-		URI location = this.storageURL.resolve(URIUtils.sanitize(String.format("/1.1/%s/storage/%s/%s", this.user, collection, id)));			
+		URI location = this.storageURL.resolve(URIUtils.sanitize(String.format("1.1/%s/storage/%s/%s", this.user, collection, id)));			
 		return this.get(location);
 	}
 	
 	public WeaveBasicObject get(String path) throws WeaveException, NotFoundException {
-		URI location = this.storageURL.resolve(URIUtils.sanitize(String.format("/1.1/%s/storage/%s", this.user, path)));
+		URI location = this.storageURL.resolve(URIUtils.sanitize(String.format("1.1/%s/storage/%s", this.user, path)));
 		return this.get(location);
 	}
 
@@ -228,7 +228,7 @@ public class StorageApiV1_1 extends StorageApi {
 
 	private URI buildCollectionUri(String collection, String[] ids, Double older, Double newer, Integer index_above, Integer index_below, Integer limit, Integer offset, String sort, String format, boolean full) throws WeaveException {
 
-		URI location = this.storageURL.resolve(URIUtils.sanitize(String.format("/1.1/%s/storage/%s", this.user, collection)));
+		URI location = this.storageURL.resolve(URIUtils.sanitize(String.format("1.1/%s/storage/%s", this.user, collection)));
 		
 		//Build list of URL querystring parameters
 		List<NameValuePair> params = new LinkedList<NameValuePair>();
@@ -378,12 +378,12 @@ public class StorageApiV1_1 extends StorageApi {
 	}
 
 	public Double put(String collection, String id, WeaveBasicObject wbo) throws WeaveException {
-		URI location = this.storageURL.resolve(URIUtils.sanitize(String.format("/1.1/%s/storage/%s/%s", this.user, collection, id)));
+		URI location = this.storageURL.resolve(URIUtils.sanitize(String.format("1.1/%s/storage/%s/%s", this.user, collection, id)));
 		return put(location, wbo);
 	}
 	
 	public Double put(String path, WeaveBasicObject wbo) throws WeaveException {
-		URI location = this.storageURL.resolve(URIUtils.sanitize(String.format("/1.1/%s/storage/%s", this.user, path)));
+		URI location = this.storageURL.resolve(URIUtils.sanitize(String.format("1.1/%s/storage/%s", this.user, path)));
 		return this.put(location, wbo);
 	}
 
@@ -423,9 +423,9 @@ public class StorageApiV1_1 extends StorageApi {
 	public Double delete(String collection, String id) throws WeaveException {
 		URI location = null;
 		if (id == null) {
-			location = this.storageURL.resolve(URIUtils.sanitize(String.format("/1.1/%s/storage/%s", this.user, collection)));
+			location = this.storageURL.resolve(URIUtils.sanitize(String.format("1.1/%s/storage/%s", this.user, collection)));
 		} else {
-			location = this.storageURL.resolve(URIUtils.sanitize(String.format("/1.1/%s/storage/%s/%s", this.user, collection, id)));			
+			location = this.storageURL.resolve(URIUtils.sanitize(String.format("1.1/%s/storage/%s/%s", this.user, collection, id)));			
 		}
 		return this.delete(location);
 	}

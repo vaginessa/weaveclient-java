@@ -55,7 +55,7 @@ public class RegistrationApiV1_0 extends AccountApi {
 		}
 
 		//Build registration URL
-		URI location = this.baseURL.resolve(URIUtils.sanitize(String.format("/user/1.0/%s", user)));
+		URI location = this.baseURL.resolve(URIUtils.sanitize(String.format("user/1.0/%s", user)));
 				
 		//Build HTTP request content
 		JSONObject jobj = new JSONObject();
@@ -99,7 +99,7 @@ public class RegistrationApiV1_0 extends AccountApi {
 		
 		//TODO - confirm account exists, i.e. /user/1.0/USER returns 1
 		
-		URI location = this.baseURL.resolve(URIUtils.sanitize(String.format("/user/1.0/%s/node/weave", this.user)));
+		URI location = this.baseURL.resolve(URIUtils.sanitize(String.format("user/1.0/%s/node/weave", this.user)));
 		HttpGet get = new HttpGet(location);
 		CloseableHttpResponse response = null;
 

@@ -72,22 +72,28 @@ public class WeaveClientV5 extends WeaveClient {
 		register(baseURL, user, password, email, WeaveClientFactory.ApiVersion.v1_1);		
 	}
 
-	@SuppressWarnings("unchecked")
 	public void register(String baseURL, String user, String password, String email, WeaveClientFactory.ApiVersion apiVersion) throws WeaveException {
 		this.user            = user;
-		this.syncKey         = null;
-		this.privateKey      = null;
-		this.bulkKeys        = null;
 
 		//TODO - handle captcha
 		
 		//Register new account
-		regClient = new RegistrationApiV1_0();
+		regClient = new RegistrationApiV1_0();		
 		regClient.register(baseURL, user, password, email);
 				
 		//Initialise storage client with account details
 		storageClient = new StorageApiV1_1();
 		storageClient.init(regClient.getStorageUrl(), user, password);
+
+		initServer();
+	}
+	
+	@SuppressWarnings("unchecked")
+	public void initServer() throws WeaveException {
+
+		this.syncKey         = null;
+		this.privateKey      = null;
+		this.bulkKeys        = null;
 
 		//1. Build and publish meta/global WBO
 		JSONObject metaObject = new JSONObject();
@@ -136,6 +142,7 @@ public class WeaveClientV5 extends WeaveClient {
 		storageClient.put(KEY_CRYPTO_PATH, wboCrypto);
 	}
 
+	
 	public void init(AccountParams params) throws WeaveException {
 		WeaveClientV5Params p = (WeaveClientV5Params)params;
 		init(p.baseURL, p.user, p.password, p.syncKey);

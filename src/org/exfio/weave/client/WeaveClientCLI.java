@@ -155,6 +155,7 @@ public class WeaveClientCLI {
 			cmd = parser.parse( options, args );
 		} catch( ParseException exp ) {
 			System.err.println( "Parsing failed: " + exp.getMessage() );
+			System.exit(1);
 		}
 		
 		if ( cmd.hasOption('h') ) {

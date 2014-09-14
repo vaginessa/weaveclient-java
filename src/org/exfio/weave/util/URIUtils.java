@@ -39,12 +39,10 @@ public class URIUtils {
 					host = host.replace(String.valueOf(c), "%" + Integer.toHexString(c));
 			
 			if (path != null)
-				// rewrite reserved characters:
-				//  ":" and "@" may be used in the host part but not in the path
 				// rewrite unsafe characters:
 				//	" ", "<", ">", """, "#", "{", "}", "|", "\", "^", "~", "["], "]", "`"
 				// do not rewrite "%" because we assume that URLs should be already encoded correctly
-				for (char c : new char[] { ':', '@', ' ', '<', '>', '"', '#', '{', '}', '|', '\\', '^', '~', '[', ']', '`' })
+				for (char c : new char[] { ' ', '<', '>', '"', '#', '{', '}', '|', '\\', '^', '~', '[', ']', '`' })
 					path = path.replace(String.valueOf(c), "%" + Integer.toHexString(c));
 			
 			String url = (schema != null) ? schema : "";
