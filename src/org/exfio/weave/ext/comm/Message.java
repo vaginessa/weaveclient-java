@@ -105,10 +105,12 @@ public abstract class Message {
 		
 		protected String sessionId;
 		protected String ephemeralKeyId;
+		protected long   sequence;
 		protected String otherClientId;
 		protected String otherIdentityKey;
 		protected String otherEphemeralKeyId;
 		protected String otherEphemeralKey;
+		protected long   otherSequence;
 		protected String state;
 		
 		public MessageSession() {	
@@ -117,19 +119,29 @@ public abstract class Message {
 		public MessageSession(MessageSession session) {	
 			this.sessionId           = session.getSessionId();
 			this.ephemeralKeyId      = session.getEphemeralKeyId();
+			this.sequence            = session.getSequence();
 			this.otherClientId       = session.getOtherClientId();
 			this.otherIdentityKey    = session.getOtherIdentityKey();
 			this.otherEphemeralKeyId = session.getOtherEphemeralKeyId();
 			this.otherEphemeralKey   = session.getOtherEphemeralKey();
+			this.otherSequence       = session.getOtherSequence();
+			this.state               = session.getState();
 		}
 		
 		public MessageSession(String ephemeralKeyId, String otherClientId, String otherIdentityKey, String otherEphemeralKeyId, String otherEphemeralKey) {
+			this(ephemeralKeyId, 0, otherClientId, otherIdentityKey, otherEphemeralKeyId, otherEphemeralKey, 0, null);
+		}
+		
+		public MessageSession(String ephemeralKeyId, long sequence, String otherClientId, String otherIdentityKey, String otherEphemeralKeyId, String otherEphemeralKey, long otherSequence, String state) {
 			this.sessionId           = ephemeralKeyId + otherEphemeralKeyId;
 			this.ephemeralKeyId      = ephemeralKeyId;
+			this.sequence            = sequence;
 			this.otherClientId       = otherClientId;
 			this.otherIdentityKey    = otherIdentityKey;
 			this.otherEphemeralKeyId = otherEphemeralKeyId;
 			this.otherEphemeralKey   = otherEphemeralKey;
+			this.otherSequence       = otherSequence;
+			this.state               = state;
 		}
 	}
 }

@@ -13,13 +13,13 @@ import java.util.List;
 import java.util.ListIterator;
 
 import org.apache.commons.codec.binary.Base32;
-
 import org.exfio.weave.WeaveException;
 import org.exfio.weave.client.NotFoundException;
 import org.exfio.weave.client.WeaveClient;
 import org.exfio.weave.client.WeaveClientFactory;
 import org.exfio.weave.client.WeaveClientV5Params;
 import org.exfio.weave.client.WeaveClientFactory.StorageVersion;
+import org.exfio.weave.ext.clientauth.ClientAuthRequestMessage.ClientAuthVerifier;
 import org.exfio.weave.ext.comm.Client;
 import org.exfio.weave.ext.comm.Comms;
 import org.exfio.weave.ext.comm.Message;
@@ -145,9 +145,59 @@ public class ClientAuth {
 		return authCode.substring(0, chars - 1);
 	}
 
-	private boolean verifyClientAuthRequestAuthCode(String sessionId, String authCode) {
-		//FIXME - Verify out-of-band authcode
-		return true;
+	/**
+	 * buildClientAuthVerifier
+	 * @param authCode
+	 * @return ClientAuthVerifier
+	 * 
+	 * To increase difficulty of MiTM attacks concatenate authcode and password hash and use PBKDF2 to make brute forcing expensive
+	 * IMPORTANT: If password is known by attacker it would be trivial to brute force authcode
+	 * 
+	 */
+	private ClientAuthVerifier buildClientAuthVerifier(String authCode, String password) {
+		
+		byte[] passwordSaltBin = generatePasswordSalt();
+		String passwordSalt = Base64.encodeBase64String(passwordSaltBin);			
+		String passwordHash = generatePasswordHash(password, passwordSaltBin);
+		
+		byte[] authSaltBin = generateAuthSalt();
+		String authSalt = Base64.encodeBase64String(authSaltBin);
+		String authDigest = generateAuthDigest(authCode + passwordHash, authSaltBin);
+		
+		ClientAuthVerifier authVerifier = new ClientAuthVerifier();
+		authVerifier.setInnerSalt(passwordSalt);
+		authVerifier.setSalt(authSalt);
+		authVerifier.setDigest(authDigest);
+		
+		return authVerifier;
+	}
+	
+	/**
+	 * verifyClientAuthRequestAuthCode
+	 * @param cav
+	 * @param authCode
+	 * @param password
+	 * @return boolean
+	 * 
+	 * Verifies that client auth request has NOT been intercepted by a MiTM attach.
+	 * Note caveats above in buildClientAuthVerifier()
+	 *  
+	 */
+	private boolean verifyClientAuthRequestAuthCode(ClientAuthVerifier cav, String authCode, String password) {
+		
+		byte[] passwordSaltBin = Base64.decodeBase64(cav.getInnerSalt());
+		String passwordHash = generatePasswordHash(password, passwordSaltBin);
+		
+		byte[] authSaltBin = Base64.decodeBase64(cav.getSalt());
+		String authDigest = generateAuthDigest(authCode + passwordHash, authSaltBin);
+		
+		if ( authDigest.equals(cav.getDigest()) ) {
+			Log.getInstance().info("Client auth verification succeeded");
+			return true;
+		} else {
+			Log.getInstance().info("Client auth verification failed");
+			return false;
+		}
 	}
 
 	private String getAuthorisedSyncKey() {
@@ -237,32 +287,66 @@ public class ClientAuth {
 	        
 			//Build client auth request
 			msg.setClientId(comms.getClientId());
-			msg.setClientName(comms.getClientName());
-			
-			//Build auth verifier
-			//To increase difficulty of MiTM attacks concatenate authcode and password hash and use PBKDF2 to make brute forcing expensive
-			//IMPORTANT: If password is known by attacker it would be trivial to brute force authcode
-
-			byte[] passwordSaltBin = generatePasswordSalt();
-			String passwordSalt = Base64.encodeBase64String(passwordSaltBin);			
-			String passwordHash = generatePasswordHash(password, passwordSaltBin);
-			
-			byte[] authSaltBin = generateAuthSalt();
-			String authSalt = Base64.encodeBase64String(authSaltBin);
-			String authDigest = generateAuthDigest(authCode + passwordHash, authSaltBin);
-			
-			ClientAuthRequestMessage.ClientAuthVerifier authVerifier = new ClientAuthRequestMessage.ClientAuthVerifier();
-			authVerifier.setInnerSalt(passwordSalt);
-			authVerifier.setSalt(authSalt);
-			authVerifier.setDigest(authDigest);
-			
-			msg.setAuth(authVerifier);
+			msg.setClientName(comms.getClientName());			
+			msg.setAuth(buildClientAuthVerifier(authCode, password));
 			
 			@SuppressWarnings("unused")
 			Double modified = comms.sendMessage(msg);
 		}		
 	}
 
+	private void sendClientAuthResponse(String sessionId, boolean authorised, String authCode, String password) throws WeaveException {
+		Log.getInstance().debug("sendClientAuthResponse()");
+				
+		Message[] sessMsgs = null;
+		try {
+			sessMsgs = comms.getMessagesBySession(sessionId);
+		} catch (NotFoundException e) {
+			throw new WeaveException(String.format("Couldn't get messages for session '%s'", sessionId));
+		}
+		if ( sessMsgs.length != 1 ) {
+			throw new WeaveException(String.format("Multiple messages in session '%s'. Only one message expected.", sessionId));
+		}
+		if ( !sessMsgs[0].getMessageType().equalsIgnoreCase("clientauthrequest") ) {
+			throw new WeaveException(String.format("Message '%s' is type '%s'. Client auth request message expected.", sessMsgs[0].getMessageId(), sessMsgs[0].getMessageType()));
+		}
+		
+		ClientAuthRequestMessage caRequestMsg = new ClientAuthRequestMessage(sessMsgs[0]);
+		
+		if ( !caRequestMsg.getSession().getState().equalsIgnoreCase("responsepending") ) {
+			throw new WeaveException(String.format("Invalid state for client auth message '%s'", sessionId));
+		}
+		
+		if (authorised && !verifyClientAuthRequestAuthCode(caRequestMsg.getAuth(), authCode, password) ) {
+			throw new WeaveException(String.format("Auth code verfication failed for client '%s' (%s)", caRequestMsg.getClientName(), caRequestMsg.getClientId()));
+		}
+
+		ClientAuthResponseMessage caResponseMsg = new ClientAuthResponseMessage(comms.getNewMessage(caRequestMsg.getMessageSessionId()));
+		
+		caResponseMsg.setClientId(comms.getClientId());
+		caResponseMsg.setClientName(comms.getClientName());
+				
+		if ( authorised ) {
+			caResponseMsg.setStatus("okay");
+			caResponseMsg.setMessage("Client authentication request approved");
+			caResponseMsg.setSyncKey(syncKey);
+		} else {
+			caResponseMsg.setStatus("fail");
+			caResponseMsg.setMessage("Client authentication request declined");
+		}
+		
+		comms.sendMessage(caResponseMsg);
+		
+	}
+
+	public void approveClientAuth(String sessionId, String authCode, String password) throws WeaveException {
+		sendClientAuthResponse(sessionId, true, authCode, password);
+	}
+
+	public void rejectClientAuth(String sessionId) throws WeaveException {
+		sendClientAuthResponse(sessionId, false, null, null);
+	}
+	
 	public Message[] processClientAuthMessages() throws WeaveException {
 		Log.getInstance().debug("processClientAuthMessages()");
 
@@ -380,59 +464,5 @@ public class ClientAuth {
 		//Set message to read
 		comms.updateMessage(msg.getMessageId(), true, false);
 						
-	}
-
-	public void sendClientAuthResponse(String sessionId, boolean authorised, String authCode) throws WeaveException {
-		Log.getInstance().debug("sendClientAuthResponse()");
-				
-		Message[] sessMsgs = null;
-		try {
-			sessMsgs = comms.getMessagesBySession(sessionId);
-		} catch (NotFoundException e) {
-			throw new WeaveException(String.format("Couldn't get messages for session '%s'", sessionId));
-		}
-		if ( sessMsgs.length != 1 ) {
-			throw new WeaveException(String.format("Multiple messages in session '%s'. Only one message expected.", sessionId));
-		}
-		if ( !sessMsgs[0].getMessageType().equalsIgnoreCase("clientauthrequest") ) {
-			throw new WeaveException(String.format("Message '%s' is type '%s'. Client auth request message expected.", sessMsgs[0].getMessageId(), sessMsgs[0].getMessageType()));
-		}
-		
-		ClientAuthRequestMessage caRequestMsg = new ClientAuthRequestMessage(sessMsgs[0]);
-				
-		if ( !caRequestMsg.getSession().getState().equalsIgnoreCase("responsepending") ) {
-			throw new WeaveException(String.format("Invalid state for client auth message '%s'", sessionId));
-		}
-		
-		boolean verified = false;
-		
-		if (authorised) {
-			verified = verifyClientAuthRequestAuthCode(sessionId, authCode);
-			if (!verified) {
-				Log.getInstance().warn(String.format("Auth code verfication failed for client '%s' (%s)", caRequestMsg.getClientName(), caRequestMsg.getClientId()));
-			}
-		}
-
-		ClientAuthResponseMessage caResponseMsg = new ClientAuthResponseMessage(comms.getNewMessage(caRequestMsg.getMessageSessionId()));
-
-		//FIXME - Set in comms object?
-		caResponseMsg.setSequence(2);
-		
-		caResponseMsg.setClientId(comms.getClientId());
-		caResponseMsg.setClientName(comms.getClientName());
-				
-		if ( authorised && verified ) {
-			caResponseMsg.setStatus("okay");
-			caResponseMsg.setMessage("Client authentication request approved");
-			caResponseMsg.setSyncKey(syncKey);
-		} else {
-			caResponseMsg.setStatus("fail");
-			caResponseMsg.setMessage("Client authentication request declined");
-		}
-		
-		comms.sendMessage(caResponseMsg);
-		
-	}
-	
-	
+	}	
 }

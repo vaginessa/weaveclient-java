@@ -549,10 +549,12 @@ public class Comms {
 		MessageSession sess = new MessageSession();
 		sess.setSessionId(ephemeralKeyId + otherEphemeralKey.getKeyId());
 		sess.setEphemeralKeyId(ephemeralKeyId);
+		sess.setSequence(0);
 		sess.setOtherClientId(otherClient.getClientId());
 		sess.setOtherIdentityKey(otherClient.getPublicKey());
 		sess.setOtherEphemeralKeyId(otherEphemeralKey.getKeyId());
 		sess.setOtherEphemeralKey(otherEphemeralKey.getPublicKey());
+		sess.setOtherSequence(0);
 		sess.setState(state);
 		try {
 			CommsStorage.createMessageSession(db, sess);
@@ -564,8 +566,12 @@ public class Comms {
 	}
 
 	public void updateMessageSession(String sessionId, String state) throws WeaveException {
+		updateMessageSession(sessionId, state, null, null);
+	}
+
+	public void updateMessageSession(String sessionId, String state, Long sequence, Long otherSequence) throws WeaveException {
 		try {
-			CommsStorage.updateMessageSession(db, sessionId, state);
+			CommsStorage.updateMessageSession(db, sessionId, state, sequence, otherSequence);
 		} catch (SQLException e) {
 			throw new WeaveException(String.format("Couldn't update message session '%s'", sessionId));
 		}
@@ -573,7 +579,7 @@ public class Comms {
 
 	public Double sendMessage(Message msg) throws WeaveException {
 		int msgId;
-				
+		
 		try {
 			msgId = CommsStorage.createMessage(db, msg);
 		} catch (SQLException e) {
@@ -582,16 +588,19 @@ public class Comms {
 		
 		Double modified = commsApi.putMessage(msg.getEncodedMessage());
 		
-		//Set message isread to true and session state to requestsent
+		//FIXME - properly track sequence values
+		
+		//Set message isread to true and update session state
 		try {
 			CommsStorage.updateMessage(db, msgId, true, false);
 			
 			if ( msg.getSession().getState().equals("requestpending") ) {
-				CommsStorage.updateMessageSession(db, msg.getMessageSessionId(), "requestsent");
+				CommsStorage.updateMessageSession(db, msg.getMessageSessionId(), "requestsent", 1L, null);
 			} else if ( msg.getSession().getState().equals("responsepending") ) {
-				CommsStorage.updateMessageSession(db, msg.getMessageSessionId(), "responsesent");				
+				CommsStorage.updateMessageSession(db, msg.getMessageSessionId(), "responsesent", 1L, null);			
 			} else {
-				CommsStorage.updateMessageSession(db, msg.getMessageSessionId(), "messagesent");				
+				Log.getInstance().warn(String.format("Unrecognised state '%s' for message session '%s'", msg.getSession().getState(), msg.getMessageSessionId()));
+				CommsStorage.updateMessageSession(db, msg.getMessageSessionId(), "messagesent", null, null);	
 			}
 		} catch (SQLException e) {
 			throw new WeaveException(e);

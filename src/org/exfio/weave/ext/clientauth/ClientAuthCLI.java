@@ -282,7 +282,7 @@ public class ClientAuthCLI {
 					ClientAuthRequestMessage caMsg = (ClientAuthRequestMessage)caMsgs[i];
 					
 					if ( caMsg.getClientName().equals(clientName) ) {
-						auth.sendClientAuthResponse(caMsg.getMessageSessionId(), true, authCode);
+						auth.approveClientAuth(caMsg.getMessageSessionId(), authCode, password);
 						caFound = true;
 						break;
 					}
@@ -318,7 +318,7 @@ public class ClientAuthCLI {
 					ClientAuthRequestMessage caMsg = (ClientAuthRequestMessage)caMsgs[i];
 					
 					if ( caMsg.getClientName().equals(clientName) ) {
-						auth.sendClientAuthResponse(caMsg.getMessageSessionId(), false, null);
+						auth.rejectClientAuth(caMsg.getMessageSessionId());
 						caFound = true;
 						break;
 					}

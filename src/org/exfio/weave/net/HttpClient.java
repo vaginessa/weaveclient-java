@@ -11,35 +11,19 @@
  ******************************************************************************/
 package org.exfio.weave.net;
 
-import java.net.URI;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.io.IOException;
 
-import org.apache.http.config.ConnectionConfig;
-import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.HttpStatus;
-import org.apache.http.HttpVersion;
 import org.apache.http.StatusLine;
-import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpPut;
-import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpUriRequest; 
 import org.apache.http.client.protocol.HttpClientContext;
-import org.apache.http.config.Registry;
-import org.apache.http.config.RegistryBuilder;
 import org.apache.http.conn.socket.ConnectionSocketFactory;
 import org.apache.http.conn.ConnectionKeepAliveStrategy;
-import org.apache.http.conn.socket.PlainConnectionSocketFactory;
-import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
-import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
-import org.apache.http.impl.conn.ManagedHttpClientConnectionFactory;
-//import org.apache.http.impl.conn.ManagedHttpClientConnectionFactory;
-import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.exfio.weave.Constants;
 import org.exfio.weave.client.NotFoundException;
 import org.exfio.weave.client.PreconditionFailedException;
@@ -54,7 +38,9 @@ public class HttpClient {
 	private static HttpClient INSTANCE = null;
 	
 	private static HttpClientContext context = null;
+	@SuppressWarnings("unused")
 	private static ConnectionKeepAliveStrategy keepAlive;
+	@SuppressWarnings("unused")
 	private static ConnectionSocketFactory sslSocketFactory = null;
 	private static CloseableHttpClient httpClient = null;
 	private static ReentrantReadWriteLock httpClientLock = null;

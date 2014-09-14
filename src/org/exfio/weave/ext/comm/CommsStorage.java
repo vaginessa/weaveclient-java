@@ -15,6 +15,7 @@ import java.sql.Statement;
 import org.exfio.weave.ext.comm.Client.EphemeralKey;
 import org.exfio.weave.ext.comm.Message.EncodedMessage;
 import org.exfio.weave.ext.comm.Message.MessageSession;
+import org.exfio.weave.util.Log;
 import org.exfio.weave.util.SQLUtils;
 
 public class CommsStorage {
@@ -135,8 +136,8 @@ public class CommsStorage {
 		DefaultMessageDataMapper.createMessageSession(db, session);		
 	}
 
-	public static void updateMessageSession(Connection db, String sessionId, String state) throws SQLException {
-		DefaultMessageDataMapper.updateMessageSession(db, sessionId, state);		
+	public static void updateMessageSession(Connection db, String sessionId, String state, Long sequence, Long otherSequence) throws SQLException {
+		DefaultMessageDataMapper.updateMessageSession(db, sessionId, state, sequence, otherSequence);
 	}
 
 	//-------------------------------------------
@@ -776,11 +777,13 @@ public class CommsStorage {
 		    	+ "\n"
 		    	+ "("
 		    	+ " MessageSessionID TEXT PRIMARY KEY NOT NULL"
-		    	+ " ,EphemeralKeyID TEXT NOt NULL"
+		    	+ " ,EphemeralKeyID TEXT NOT NULL"
+		    	+ " ,Sequence INTEGER NOT NULL default 0"  	
 		    	+ " ,OtherClientID TEXT NOT NULL"
 		    	+ " ,OtherIdentityKey TEXT NOT NULL"   	
 		    	+ " ,OtherEphemeralKeyID TEXT NOT NULL"
 		    	+ " ,OtherEphemeralKey TEXT NOT NULL"
+		    	+ " ,OtherSequence INTEGER NOT NULL default 0"
 		    	+ " ,State TEXT NOT NULL"
 		    	+ ")";
 		    st.executeUpdate(SQL);
@@ -1180,7 +1183,23 @@ public class CommsStorage {
 			st.executeUpdate();
 		}
 
-		public static void updateMessageSession(Connection db, String sessionId, String state) throws SQLException {
+		public static void updateMessageSession(Connection db, String sessionId, String state, Long sequence, Long otherSequence) throws SQLException {
+			
+			if (state == null && sequence == null && otherSequence == null) {
+				Log.getInstance().warn("DefaultMessangerDataMapper.updateMessageSession() called with null arguments");
+				return;
+			}
+			
+			String setClause = "";
+			if ( state != null ) {
+				setClause += (setClause.length() == 0 ? " " : " ,") + "State = " + SQLUtils.quote(state);
+			}
+			if ( sequence != null ) {
+				setClause += (setClause.length() == 0 ? " " : " ,") + "Sequence = " + sequence.longValue();
+			}
+			if ( otherSequence != null ) {
+				setClause += (setClause.length() == 0 ? " " : " ,") + "OtherSequence = " + otherSequence.longValue();
+			}
 			
 			String SQL = null;
 			
@@ -1188,15 +1207,13 @@ public class CommsStorage {
 			SQL = "UPDATE MessageSession"
 				+ "\n"
 				+ "SET"
-				+ " State = ?"
-				+ "\n"				
+				+ "\n" + setClause + "\n"
 				+ "WHERE"
 				+ " MessageSessionID = ?";
 
 			PreparedStatement st = db.prepareStatement(SQL);
 			st.setQueryTimeout(QUERY_TIMEOUT);		
-			int col = 1;
-			st.setString(col++, state);
+			int col = 1;			
 			st.setString(col++, sessionId);
 
 			st.executeUpdate();
