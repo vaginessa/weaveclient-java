@@ -1,8 +1,8 @@
 package org.exfio.weave.ext.comm;
 
+import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -16,8 +16,6 @@ import org.exfio.weave.ext.comm.Client.EphemeralKey;
 import org.exfio.weave.ext.comm.Message.EncodedMessage;
 import org.exfio.weave.ext.comm.Message.MessageSession;
 import org.exfio.weave.util.SQLUtils;
-
-import edu.emory.mathcs.backport.java.util.Arrays;
 
 public class CommsStorage {
 
@@ -47,6 +45,14 @@ public class CommsStorage {
 
 	public static Client getClient(Connection db, String clientId) throws SQLException {
 		return ClientDataMapper.getClient(db, clientId);
+	}
+
+	public static Client getClientByName(Connection db, String clientName) throws SQLException {
+		return ClientDataMapper.getClientByName(db, clientName);
+	}
+
+	public static Client getClientSelf(Connection db) throws SQLException {
+		return ClientDataMapper.getClientSelf(db);
 	}
 
 	public static Client[] getClients(Connection db) throws SQLException {
@@ -105,8 +111,8 @@ public class CommsStorage {
 		return DefaultMessageDataMapper.getMessages(db, sessionId, messageType, state, includeRead, includeDeleted);				
 	}
 
-	public static void createMessage(Connection db, Message msg) throws SQLException {
-		DefaultMessageDataMapper.createMessage(db, msg.getEncodedMessage());
+	public static int createMessage(Connection db, Message msg) throws SQLException {
+		return DefaultMessageDataMapper.createMessage(db, msg.getEncodedMessage());
 	}
 
 	public static void updateMessage(Connection db, int messageId, boolean isRead, boolean isDeleted) throws SQLException {
@@ -324,17 +330,7 @@ public class CommsStorage {
 			return SQL;
 		}
 
-		public static Client getClient(Connection db, String clientId) throws SQLException {
-			
-			String SQL = buildQueryGetClientById(clientId, false);
-					
-			PreparedStatement st = db.prepareStatement(SQL);
-			st.setQueryTimeout(QUERY_TIMEOUT);
-			
-			ResultSet rs = st.executeQuery();
-			if ( !rs.next() ) {
-				return null;
-			}
+		protected static Client buildClientFromDB(Connection db, ResultSet rs) throws SQLException {
 			
 			Client client = new Client();
 			client.setClientId(rs.getString("ClientID"));
@@ -347,8 +343,66 @@ public class CommsStorage {
 			client.setVersion(rs.getString("Version"));
 			client.setModifiedDate(SQLUtils.sqliteDatetime(rs.getString("ModifiedDate")));
 			
-			EphemeralKey[] ekeys = getClientEphemeralKeys(db, clientId, true, false);
+			EphemeralKey[] ekeys = getClientEphemeralKeys(db, client.getClientId(), true, false);
 			client.setEphemeralKeys(new ArrayList<EphemeralKey>(Arrays.asList(ekeys)));
+	
+			return client;
+		}
+		
+		public static Client getClient(Connection db, String clientId) throws SQLException {
+			
+			String SQL = buildQueryGetClientById(clientId, false);
+					
+			PreparedStatement st = db.prepareStatement(SQL);
+			st.setQueryTimeout(QUERY_TIMEOUT);
+			
+			ResultSet rs = st.executeQuery();
+			if ( !rs.next() ) {
+				return null;
+			}
+			
+			Client client = buildClientFromDB(db, rs);
+
+			return client;
+		}
+
+		public static Client getClientByName(Connection db, String clientName) throws SQLException {
+			
+			String SQL = buildQueryGetClient(false);
+			
+			SQL += " AND ClientName = ?";
+			
+			PreparedStatement st = db.prepareStatement(SQL);
+			st.setQueryTimeout(QUERY_TIMEOUT);
+			
+			int col = 1;
+			st.setString(col++, clientName);
+			
+			ResultSet rs = st.executeQuery();
+			if ( !rs.next() ) {
+				return null;
+			}
+			
+			Client client = buildClientFromDB(db, rs);
+
+			return client;
+		}
+
+		public static Client getClientSelf(Connection db) throws SQLException {
+			
+			String SQL = buildQueryGetClient(false);
+			
+			SQL += " AND IsSelf = 1";
+			
+			PreparedStatement st = db.prepareStatement(SQL);
+			st.setQueryTimeout(QUERY_TIMEOUT);
+			
+			ResultSet rs = st.executeQuery();
+			if ( !rs.next() ) {
+				return null;
+			}
+			
+			Client client = buildClientFromDB(db, rs);
 
 			return client;
 		}
@@ -364,7 +418,7 @@ public class CommsStorage {
 			
 			ResultSet rs = st.executeQuery();
 			while ( rs.next() ) {
-				Client client = getClient(db, rs.getString("ClientID"));
+				Client client = buildClientFromDB(db, rs);
 				clients.add(client);
 			}
 			
@@ -471,6 +525,7 @@ public class CommsStorage {
 		public static String buildQueryGetEphemeralKeyById(String clientId, String keyId, boolean includeDeleted) {
 			String SQL = buildQueryGetEphemeralKey(includeDeleted);
 			
+			SQL += " AND ClientID = " + SQLUtils.quote(clientId);
 			SQL += " AND EphemeralKeyID = " + SQLUtils.quote(keyId);
 			
 			return SQL;
@@ -950,13 +1005,13 @@ public class CommsStorage {
 			return messages.toArray(new Message[0]);
 		}
 
-		public static void createMessage(Connection db, EncodedMessage msg) throws SQLException {
+		public static int createMessage(Connection db, EncodedMessage msg) throws SQLException {
 			
 			//Create session if it does not already exist
 			if ( getMessageSession(db, msg.getMessageSessionId()) == null ) {
 				createMessageSession(db, msg.getSession());
 			}
-					
+			
 			String SQL = null;
 				
 		    //Create message record
@@ -991,6 +1046,13 @@ public class CommsStorage {
 			st.setString(col++, msg.getContent());
 	
 			st.executeUpdate();
+			
+			ResultSet generatedKeys = st.getGeneratedKeys();
+			if (generatedKeys.next()) {
+				return generatedKeys.getInt(1);
+			} else {
+				throw new SQLException("Creating message failed, no ID obtained.");
+			}
 		}
 	
 		public static void updateMessage(Connection db, int msgId, boolean isRead, boolean isDeleted) throws SQLException {

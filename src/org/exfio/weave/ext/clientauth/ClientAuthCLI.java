@@ -1,5 +1,6 @@
 package org.exfio.weave.ext.clientauth;
 
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.File;
 import java.io.FileInputStream;
@@ -24,6 +25,8 @@ import org.exfio.weave.util.Log;
 
 public class ClientAuthCLI {
 
+	public static final String binName = "weaveauth";
+	
 	public static File buildAccountDatabasePath() throws IOException {
 		return buildAccountDatabasePath(null);
 	}
@@ -47,7 +50,7 @@ public class ClientAuthCLI {
 	public static void printUsage(Options options) {
 		System.out.println();
 		HelpFormatter formatter = new HelpFormatter();
-		formatter.printHelp( "weaveclient", options );
+		formatter.printHelp( binName, options );
 	}
 	
 	public static void main( String[] args ) {
@@ -59,6 +62,16 @@ public class ClientAuthCLI {
 		String loglevel   = null;
 		
 		WeaveClientFactory.StorageVersion storageVersion = null;
+				
+		//for (int i = 0; i < args.length; i++) {
+		//	System.out.println(String.format("args[%d]: %s", i, args[i]));
+		//}
+		
+		
+		//File binFile = new File(ClientAuthCLI.class.getProtectionDomain()
+		//		  .getCodeSource()
+		//		  .getLocation()
+		//		  .getPath());
 		
 		// Parse commandline arguments
 		Options options = new Options();
@@ -209,28 +222,47 @@ public class ClientAuthCLI {
 			System.exit(1);
 		}		
 
-		if ( cmd.hasOption('j') ) {
+		if ( cmd.hasOption('i') ) {
+			//Initialise client
+
 			//Request client auth
-			String clientName = cmd.getOptionValue('j');
-
-			Log.getInstance().info(String.format("Requesting client auth for client '%s'", clientName));
-
+			String clientName = cmd.getOptionValue('i');
+			
 			try {			
 				ClientAuth auth = new ClientAuth(weaveClient);
-				auth.authoriseClient(clientName, password, clientDatabase.getPath());
+				auth.initClientAuth(clientName, password, clientDatabase.getPath());
 			} catch(WeaveException e) {
 				System.err.println(e.getMessage());
 				System.exit(1);
 			}
 			
-			System.out.println(String.format("Sent client auth request for client '%s'", clientName));
+			System.out.println(String.format("Client auth initialised"));
 			System.exit(0);
-		}
 
-		if ( cmd.hasOption('o') ) {
+		} else if ( cmd.hasOption('j') ) {
+
+			//Request client auth
+			String clientName = cmd.getOptionValue('j');
+			String authCode = null;
+			
+			Log.getInstance().info(String.format("Requesting client auth for client '%s'", clientName));
+
+			try {			
+				ClientAuth auth = new ClientAuth(weaveClient);
+				auth.requestClientAuth(clientName, password, clientDatabase.getPath());
+				authCode = auth.getAuthCode();
+			} catch(WeaveException e) {
+				System.err.println(e.getMessage());
+				System.exit(1);
+			}
+			
+			System.out.println(String.format("Client auth request pending with auth code '%s'", authCode));
+			System.exit(0);
+			
+		} else if ( cmd.hasOption('o') ) {
 			
 			//Approve client auth request
-			String messageKey = cmd.getOptionValue('o', null);
+			String clientName = cmd.getOptionValue('o', null);
 			String authCode   = cmd.getOptionValue('c', null);
 
 			if ( authCode == null || authCode.isEmpty() ) {
@@ -238,35 +270,71 @@ public class ClientAuthCLI {
 				System.exit(1);
 			}
 
-			Log.getInstance().info(String.format("Approving client auth request '%s'", messageKey));
-
+			Log.getInstance().info(String.format("Approving client auth request '%s'", clientName));
+			
+			boolean caFound = false;
+			
 			try {			
 				ClientAuth auth = new ClientAuth(weaveClient, clientDatabase.getPath());
-				auth.sendClientAuthResponse(messageKey, true, authCode);
+				Message[] caMsgs = auth.processClientAuthMessages();
+								
+				for (int i = 0; i < caMsgs.length; i++) {
+					ClientAuthRequestMessage caMsg = (ClientAuthRequestMessage)caMsgs[i];
+					
+					if ( caMsg.getClientName().equals(clientName) ) {
+						auth.sendClientAuthResponse(caMsg.getMessageSessionId(), true, authCode);
+						caFound = true;
+						break;
+					}
+				}
+				
 			} catch(WeaveException e) {
 				System.err.println(e.getMessage());
 				System.exit(1);
 			}
-
-			System.out.println(String.format("Approved client auth request '%s'", messageKey));
+			
+			if (!caFound) {
+				System.out.println(String.format("Client auth request for client '%s' not found", clientName));
+				System.exit(1);
+			}
+			
+			System.out.println(String.format("Approved client auth request '%s'", clientName));				
 			System.exit(0);
 			
 		} else if ( cmd.hasOption('x') ) {
 			
 			//Reject client auth request
-			String messageKey = cmd.getOptionValue('x');
+			String clientName = cmd.getOptionValue('x');
 			
-			Log.getInstance().info(String.format("Rejecting client auth request '%s'", messageKey));
+			Log.getInstance().info(String.format("Rejecting client auth request '%s'", clientName));
 
+			boolean caFound = false;
+			
 			try {			
 				ClientAuth auth = new ClientAuth(weaveClient, clientDatabase.getPath());
-				auth.sendClientAuthResponse(messageKey, false, null);
+				Message[] caMsgs = auth.processClientAuthMessages();
+								
+				for (int i = 0; i < caMsgs.length; i++) {
+					ClientAuthRequestMessage caMsg = (ClientAuthRequestMessage)caMsgs[i];
+					
+					if ( caMsg.getClientName().equals(clientName) ) {
+						auth.sendClientAuthResponse(caMsg.getMessageSessionId(), false, null);
+						caFound = true;
+						break;
+					}
+				}
+				
 			} catch(WeaveException e) {
 				System.err.println(e.getMessage());
 				System.exit(1);
 			}
 			
-			System.out.println(String.format("Rejected client auth request '%s'", messageKey));
+			if (!caFound) {
+				System.err.println(String.format("Client auth request for client '%s' not found", clientName));
+				System.exit(1);
+			}
+
+			System.out.println(String.format("Rejected client auth request '%s'", clientName));
 			System.exit(0);
 
 		} else if ( cmd.hasOption('m') ) {
@@ -277,7 +345,31 @@ public class ClientAuthCLI {
 			
 			try {			
 				ClientAuth auth = new ClientAuth(weaveClient, clientDatabase.getPath());
+				
+				String curStatus = auth.getAuthStatus();
 				caMsgs = auth.processClientAuthMessages();
+				String newStatus = auth.getAuthStatus();
+
+				if ( curStatus != null && curStatus.equals("pending") ) {
+					
+					//If client has been authorised update configuration
+					if ( newStatus.equals("authorised") ) {
+						clientProp.setProperty(WeaveClientCLI.KEY_ACCOUNT_CONFIG_SYNCKEY, auth.getSyncKey());
+						
+						try {
+							clientProp.store(new FileOutputStream(clientConfig), "");
+						} catch (IOException e) {
+							System.err.println(String.format("Couldn't write client config file '%s'", clientConfig.getAbsolutePath()));
+							System.exit(1);;
+						}
+
+						System.out.println(String.format("Client auth approved by '%s'", auth.getAuthBy()));
+						
+					} else if ( newStatus.equals("pending") ) {
+						System.out.println(String.format("Client auth request pending with auth code '%s'", auth.getAuthCode()));
+					}
+				}
+				
 			} catch(WeaveException e) {
 				System.err.println(e.getMessage());
 				System.exit(1);
@@ -285,7 +377,20 @@ public class ClientAuthCLI {
 			
 			for (int i = 0; i < caMsgs.length; i++) {
 				ClientAuthRequestMessage caMsg = (ClientAuthRequestMessage)caMsgs[i];
-				System.out.println(String.format("Client auth request received from '%s'", caMsg.getClientName()));
+				System.out.println(
+					String.format(
+						"Client auth request received from '%s'.\n"
+						+ "To approve request use the command\n"
+						+ "%s -o %s -c AUTHCODE\n"
+						+ "To reject request use the command\n"
+						+ "%s -x %s\n", 
+						caMsg.getClientName(),
+						binName,
+						caMsg.getClientName(),						
+						binName,
+						caMsg.getClientName()						
+					)
+				);
 			}
 			
 			System.exit(0);

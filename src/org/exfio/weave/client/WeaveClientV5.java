@@ -182,6 +182,10 @@ public class WeaveClientV5 extends WeaveClient {
         return Base64.encodeToString(weaveID, Base64.NO_PADDING | Base64.NO_WRAP | Base64.URL_SAFE);
 	}
 
+	public boolean isAuthorised() {
+		return ( syncKey != null ); 
+	}
+	
 	private WeaveKeyPair generateWeaveKeyPair() {
         SecureRandom rnd = new SecureRandom();
         WeaveKeyPair keyPair = new WeaveKeyPair();

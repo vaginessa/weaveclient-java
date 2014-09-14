@@ -1,15 +1,18 @@
 package org.exfio.weave.ext.clientauth;
 
-import java.io.File;
 import java.lang.AssertionError;
 import java.lang.Math;
 import java.security.SecureRandom;
-
-import org.apache.commons.codec.binary.Base32;
-
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.ListIterator;
+
+import org.apache.commons.codec.binary.Base32;
 
 import org.exfio.weave.WeaveException;
 import org.exfio.weave.client.NotFoundException;
@@ -20,7 +23,6 @@ import org.exfio.weave.client.WeaveClientFactory.StorageVersion;
 import org.exfio.weave.ext.comm.Client;
 import org.exfio.weave.ext.comm.Comms;
 import org.exfio.weave.ext.comm.Message;
-import org.exfio.weave.ext.comm.CommsStorage;
 import org.exfio.weave.ext.comm.Message.MessageSession;
 import org.exfio.weave.ext.crypto.PBKDF2;
 import org.exfio.weave.util.Log;
@@ -33,21 +35,27 @@ public class ClientAuth {
 	public static final String MESSAGE_TYPE_CLIENTAUTHRESPONSE = "clientauthresponse";
 
 	//ClientAuth config
+	public static final String KEY_CLIENT_CONFIG_AUTHSTATUS  = "clientauth.status";
 	public static final String KEY_CLIENT_CONFIG_AUTHCODE    = "clientauth.authcode";
 	public static final String KEY_CLIENT_CONFIG_AUTHBY      = "clientauth.authby";
 	public static final String KEY_CLIENT_CONFIG_AUTHSYNCKEY = "clientauth.synckey";
 			
 	private WeaveClient wc;
 	private Comms comms;
-	private Connection db;
 		
 	@lombok.Getter private String authCode;
 	@lombok.Getter private String syncKey;
+	@lombok.Getter private String authStatus;
+	@lombok.Getter private String authBy;
 		
 	public ClientAuth(WeaveClient wc) {
 		this.wc       = wc;
-		this.db       = null;
 		this.comms    = new Comms(wc);
+		
+		this.authStatus = null;
+		this.authCode   = null;
+		this.authBy     = null;
+		this.syncKey    = null;
 	}
 
 	public ClientAuth(WeaveClient wc, String database) {	
@@ -64,14 +72,23 @@ public class ClientAuth {
 	}
 
 	private void init(WeaveClient wc, Connection db) {
-		this.wc              = wc;
-		this.db              = db;
+		this.wc    = wc;
 		this.comms = new Comms(wc, db);		
-				
+		
+		try {
+			authStatus = comms.getProperty(KEY_CLIENT_CONFIG_AUTHSTATUS);
+			authCode   = comms.getProperty(KEY_CLIENT_CONFIG_AUTHCODE);
+			authBy     = comms.getProperty(KEY_CLIENT_CONFIG_AUTHBY);
+			syncKey    = comms.getProperty(KEY_CLIENT_CONFIG_AUTHSYNCKEY);		
+		} catch (WeaveException e){
+			throw new AssertionError(String.format("Error loading client auth properties - %s", e.getMessage()));
+		}
+
 		java.security.Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());
 	}
 	
 	//FIXME - Password is discarded as soon as it is used hence it is currently not possible to retrieve it from WeaveClient 
+	@SuppressWarnings("unused")
 	private String getWeavePassword() throws WeaveException {
 		String password = null;
 		if ( wc.getStorageVersion() == WeaveClientFactory.StorageVersion.v5 ) {
@@ -132,49 +149,68 @@ public class ClientAuth {
 		//FIXME - Verify out-of-band authcode
 		return true;
 	}
-	
-	private boolean isAuthorised() {
+
+	private String getAuthorisedSyncKey() {
 		if ( wc.getStorageVersion() == StorageVersion.v5 ) {
-			return ( ((WeaveClientV5Params)wc.getClientParams()).syncKey != null );
+			return ((WeaveClientV5Params)wc.getClientParams()).syncKey;
 		} else {
-			return false;
+			return null;
 		}
 	}
+
+	private boolean isAuthorised() {
+		return wc.isAuthorised();
+	}
+
+
+	public void initClientAuth(String clientName, String password, String database) throws WeaveException {
+		Log.getInstance().debug("initClientAuth()");
+
+		if ( !isAuthorised() ) {
+			throw new WeaveException("Must be an authorised client to reset client auth collections");
+		}
 		
-	//@SuppressWarnings("unchecked")
-	public void authoriseClient(String clientName, String password, String database) throws WeaveException {
+		//FIXME - Rotate sync key and revoke auth status for other clients (preserve clientId?)
+		//For now clean clientauth collections and recreate client from scratch
+		
+		comms.initServer();		
+		comms.initClient(clientName, true, database);
+		
+		//Set clientauth properties
+		authStatus = "authorised";
+		syncKey    = getAuthorisedSyncKey();
+		
+		comms.setProperty(KEY_CLIENT_CONFIG_AUTHSTATUS, "authorised");
+		comms.setProperty(KEY_CLIENT_CONFIG_AUTHSYNCKEY, syncKey);
+		comms.setProperty(KEY_CLIENT_CONFIG_AUTHBY, "self");
+	}
+
+	public void requestClientAuth(String clientName, String password, String database) throws WeaveException {
 		Log.getInstance().debug("authoriseClient()");
 
 		//TODO - Warn user if client has already been initialised
-		File dbPath = new File(database);
-		if ( dbPath.exists() ) {
-			Log.getInstance().warn(String.format("Database '%s' already exists", database));
-			
-			//Connect to database and update client record
-			try {
-				Connection jdbcDb = DriverManager.getConnection("jdbc:sqlite:" + database);
-				init(wc, jdbcDb);
-			} catch (SQLException e) {
-				throw new WeaveException("Couldn't initalise database connection - " + e.getMessage());
-			}
-			comms.updateClient();
-			
-		} else {
-			
-			//Initialise database and create client record
-			comms.initClient(clientName, isAuthorised(), database);
-		}
+
+		//Initialise database and create client record
+		comms.initClient(clientName, isAuthorised(), database);
 		
-		db = comms.getDB();
+		if ( isAuthorised() ) {
+
+			//Client already authorised
+			authStatus = "authorised";
+			syncKey    = getAuthorisedSyncKey();
+			
+			comms.setProperty(KEY_CLIENT_CONFIG_AUTHSTATUS, "authorised");
+			comms.setProperty(KEY_CLIENT_CONFIG_AUTHSYNCKEY, syncKey);
+			comms.setProperty(KEY_CLIENT_CONFIG_AUTHBY, "self");
+			return;
+		}
 		
 		//Generate and store auth code
-		authCode = generateAuthCode();
+		authStatus = "pending";
+		authCode   = generateAuthCode();
 		
-		try {
-			CommsStorage.setProperty(db, KEY_CLIENT_CONFIG_AUTHCODE, authCode);
-		} catch (SQLException e) {
-			throw new WeaveException("Couldn't set property for key 'authcode' - " + e.getMessage());
-		}
+		comms.setProperty(KEY_CLIENT_CONFIG_AUTHSTATUS, authStatus);
+		comms.setProperty(KEY_CLIENT_CONFIG_AUTHCODE, authCode);
 		
 		//Get existing clients and create registration for each
 		Client[] clients = comms.getClients();
@@ -195,7 +231,6 @@ public class ClientAuth {
 		
 			//Create new session for client
 			MessageSession session = comms.createOutgoingMessageSession(clients[i].getClientId());
-			
 			
 	        ClientAuthRequestMessage msg = new ClientAuthRequestMessage(comms.getNewMessage(session));	        
 	        msg.setSequence(1);
@@ -223,6 +258,7 @@ public class ClientAuth {
 			
 			msg.setAuth(authVerifier);
 			
+			@SuppressWarnings("unused")
 			Double modified = comms.sendMessage(msg);
 		}		
 	}
@@ -232,21 +268,44 @@ public class ClientAuth {
 
 		comms.checkMessages();
 		
-		Message[] msgs = comms.getUnreadMessages();
+		List<Message> msgUnread = new ArrayList<Message>(Arrays.asList(comms.getUnreadMessages()));
 
-		for (int i = 0; i < msgs.length ; i++) {
-			if ( msgs[i].getMessageType().equals(MESSAGE_TYPE_CLIENTAUTHREQUEST) ) {
-				processClientAuthRequest(new ClientAuthRequestMessage(msgs[i]));
-			} else if ( msgs[i].getMessageType().equals(MESSAGE_TYPE_CLIENTAUTHRESPONSE) ) {
-				processClientAuthResponse(new ClientAuthResponseMessage(msgs[i]));	
+		Iterator<Message> iterUnread = msgUnread.listIterator();
+		while ( iterUnread.hasNext() ) {
+			Message msg = iterUnread.next();
+			
+			if ( msg.getSession().getState().equals("closed") ) {
+				Log.getInstance().warn(String.format("Message could not be processed - session '%s' is closed:", msg.getMessageSessionId()));
+			}
+			
+			if ( msg.getMessageType().equals(MESSAGE_TYPE_CLIENTAUTHREQUEST) ) {
+				processClientAuthRequest(new ClientAuthRequestMessage(msg));
+			} else if ( msg.getMessageType().equals(MESSAGE_TYPE_CLIENTAUTHRESPONSE) ) {
+				processClientAuthResponse(new ClientAuthResponseMessage(msg));	
 			}
 		}
 		
-		msgs = comms.getPendingMessages(MESSAGE_TYPE_CLIENTAUTHREQUEST);
-		for (int i = 0; i < msgs.length; i++) {
-			msgs[i] = new ClientAuthRequestMessage(msgs[i]);
+		List<Message> msgPending = new ArrayList<Message>(Arrays.asList(comms.getPendingMessages(MESSAGE_TYPE_CLIENTAUTHREQUEST)));
+		
+		ListIterator<Message> iterPending = msgPending.listIterator();
+		while ( iterPending.hasNext() ) {
+			Message msg = iterPending.next();
+
+			Client otherClient = comms.getClient(msg.getSourceClientId());
+			
+			//Nothing to do if status no longer pending
+			if ( !otherClient.getStatus().equals("pending") ) {
+				Log.getInstance().info(String.format("Client '%s' (%s) status '%s'. Discarding client auth request", otherClient.getClientName(), otherClient.getClientId(), otherClient.getStatus()));
+				comms.updateMessageSession(msg.getMessageSessionId(), "closed");
+				//remove message from pending list
+				iterPending.remove();
+				continue;
+			}
+
+			//Re instansiate as ClientAuthRequestMessage
+			iterPending.set(new ClientAuthRequestMessage(msg));
 		}
-		return msgs;
+		return msgPending.toArray(new Message[0]);
 	}
 
 	public void processClientAuthResponse(ClientAuthResponseMessage msg) throws WeaveException {
@@ -256,21 +315,13 @@ public class ClientAuth {
 				
 		if ( !msg.getClientId().equals(session.getOtherClientId()) ) {
 			Log.getInstance().error(String.format("Invalid client auth response, client Id mismatch '%s' - sessionid: '%s', client: '%s' (%s)", msg.getClientId(), session.getSessionId(), msg.getClientName(), msg.getClientId()));
-			try {
-				CommsStorage.updateMessageSession(db, session.getSessionId(), "closed");
-			} catch (SQLException e) {
-				throw new WeaveException(String.format("Couldn't update client auth session '%s'", msg.getMessageSessionId()));
-			}
+			comms.updateMessageSession(session.getSessionId(), "closed");
 			throw new WeaveException("Invalid client auth response");
 		}
 
 		if ( !msg.getStatus().matches("(?i)okay|fail") ) {
 			Log.getInstance().error(String.format("Invalid client auth response, unknown status '%s' - sessionid: '%s', client: '%s' (%s) is unknown - %s: %s", msg.getStatus(), session.getSessionId(), msg.getClientName(), msg.getClientId()));					
-			try {
-				CommsStorage.updateMessageSession(db, session.getSessionId(), "closed");
-			} catch (SQLException e) {
-				throw new WeaveException(String.format("Couldn't update client auth session '%s'", msg.getMessageSessionId()));
-			}
+			comms.updateMessageSession(session.getSessionId(), "closed");
 			throw new WeaveException("Invalid client auth response");
 		}
 
@@ -280,27 +331,30 @@ public class ClientAuth {
 			
 			if ( msg.getSyncKey() == null || msg.getSyncKey().length() == 0 ) {
 				Log.getInstance().error(String.format("Invalid client auth response, synckey missing - sessionid: '%s', client: '%s' (%s) is unknown - %s: %s", msg.getStatus(), session.getSessionId(), msg.getClientName(), msg.getClientId()));					
-				try {
-					CommsStorage.updateMessageSession(db, session.getSessionId(), "closed");
-				} catch (SQLException e) {
-					throw new WeaveException(String.format("Couldn't update client auth session '%s'", msg.getMessageSessionId()));
-				}
+				comms.updateMessageSession(session.getSessionId(), "closed");
 				throw new WeaveException("Invalid client auth response");
 			}
 			
-			//Success!			
-			comms.setProperty(KEY_CLIENT_CONFIG_AUTHSYNCKEY, msg.getSyncKey());
-			comms.setProperty(KEY_CLIENT_CONFIG_AUTHBY, msg.getClientName());
-						
+			//Success!
+			authStatus = "authorised";
+			syncKey = msg.getSyncKey();
+			authBy  = msg.getClientName();
+			
+			comms.setProperty(KEY_CLIENT_CONFIG_AUTHSTATUS, authStatus);
+			comms.setProperty(KEY_CLIENT_CONFIG_AUTHSYNCKEY, syncKey);
+			comms.setProperty(KEY_CLIENT_CONFIG_AUTHBY, authBy);
+			
+			//Update client record
+			comms.getClientSelf().setStatus(authStatus);
+			comms.updateClient();
+			
 		} else {
 			//Do nothing
 		}
 
-		try {
-			CommsStorage.updateMessageSession(db, session.getSessionId(), "closed");
-		} catch (SQLException e) {
-			throw new WeaveException(String.format("Couldn't update client auth session '%s'", msg.getMessageSessionId()));
-		}
+		//Set message to read and close session
+		comms.updateMessage(msg.getMessageId(), true, false);
+		comms.updateMessageSession(session.getSessionId(), "closed");
 		
 	}
 
@@ -313,24 +367,14 @@ public class ClientAuth {
 
 		if ( !msg.getClientId().equals(caSession.getOtherClientId()) ) {
 			Log.getInstance().error(String.format("Invalid client auth request, client Id mismatch '%s' - sessionid: '%s', client: '%s' (%s)", msg.getClientId(), caSession.getSessionId(), msg.getClientName(), msg.getClientId()));
-			try {
-				CommsStorage.updateMessageSession(db, caSession.getSessionId(), "closed");
-			} catch (SQLException e) {
-				throw new WeaveException(String.format("Couldn't update client auth session '%s'", msg.getMessageSessionId()));
-			}
-			throw new WeaveException("Invalid client auth response");
+			comms.updateMessageSession(caSession.getSessionId(), "closed");
+			throw new WeaveException("Invalid client auth request");
 		}
 
 		//Nothing to do if status no longer pending
 		if ( !otherClient.getStatus().equals("pending") ) {
 			Log.getInstance().warn(String.format("Client '%s' (%s) status '%s'. Nothing to do", otherClient.getClientName(), otherClient.getClientId(), otherClient.getStatus()));
-			try {
-				CommsStorage.updateMessageSession(db, caSession.getSessionId(), "closed");
-			} catch (SQLException e) {
-				throw new WeaveException(String.format("Couldn't update client auth session '%s'", msg.getMessageSessionId()));
-			}
-			comms.updateMessage(msg.getMessageId(), true, false);
-			return;
+			comms.updateMessageSession(caSession.getSessionId(), "closed");
 		}
 
 		//Set message to read
@@ -338,16 +382,9 @@ public class ClientAuth {
 						
 	}
 
-
 	public void sendClientAuthResponse(String sessionId, boolean authorised, String authCode) throws WeaveException {
 		Log.getInstance().debug("sendClientAuthResponse()");
-		
-		if ( wc.getStorageVersion() == StorageVersion.v5 ) {
-			syncKey = ((WeaveClientV5Params)wc.getClientParams()).syncKey;
-		} else {
-			throw new WeaveException(String.format("Storage version %s not supported", WeaveClientFactory.storageVersionToString(wc.getStorageVersion())));
-		}
-		
+				
 		Message[] sessMsgs = null;
 		try {
 			sessMsgs = comms.getMessagesBySession(sessionId);
@@ -357,7 +394,7 @@ public class ClientAuth {
 		if ( sessMsgs.length != 1 ) {
 			throw new WeaveException(String.format("Multiple messages in session '%s'. Only one message expected.", sessionId));
 		}
-		if ( !sessMsgs[0].getMessageType().equalsIgnoreCase("clientauth") ) {
+		if ( !sessMsgs[0].getMessageType().equalsIgnoreCase("clientauthrequest") ) {
 			throw new WeaveException(String.format("Message '%s' is type '%s'. Client auth request message expected.", sessMsgs[0].getMessageId(), sessMsgs[0].getMessageType()));
 		}
 		
@@ -394,6 +431,7 @@ public class ClientAuth {
 		}
 		
 		comms.sendMessage(caResponseMsg);
+		
 	}
 	
 	

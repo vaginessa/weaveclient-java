@@ -6,7 +6,6 @@ import org.json.simple.JSONObject;
 import org.exfio.weave.WeaveException;
 import org.exfio.weave.client.WeaveClient;
 import org.exfio.weave.client.WeaveClientV5;
-import org.exfio.weave.util.Log;
 
 public class WeaveClientFactory {
 	

@@ -358,7 +358,7 @@ public class CommsApiV1 {
 		//FIXME - create bulk keys for exfioclient and exfiomessage collections
 
 	}
-
+	
 	public Client getClient(String clientId) throws WeaveException, NotFoundException {
 		try {
 			WeaveBasicObject wbo = wc.get(KEY_CLIENT_COLLECTION, clientId, false);

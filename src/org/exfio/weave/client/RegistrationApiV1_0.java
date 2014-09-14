@@ -9,9 +9,7 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPut;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.util.EntityUtils;
-
 import org.json.simple.JSONObject;
-
 import org.exfio.weave.WeaveException;
 import org.exfio.weave.client.WeaveClientFactory.ApiVersion;
 import org.exfio.weave.net.HttpException;
@@ -24,6 +22,7 @@ public class RegistrationApiV1_0 extends AccountApi {
 		
 	private URI    baseURL;
 	private String user;
+	@SuppressWarnings("unused")
 	private String password;
 		
 	public RegistrationApiV1_0() throws WeaveException {

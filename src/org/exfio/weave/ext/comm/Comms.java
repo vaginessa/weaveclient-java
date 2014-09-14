@@ -2,9 +2,10 @@ package org.exfio.weave.ext.comm;
 
 
 import java.lang.AssertionError;
+import java.util.Arrays;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
-import java.util.ListIterator;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -25,7 +26,6 @@ import org.exfio.weave.ext.crypto.ECDH;
 import org.exfio.weave.util.Log;
 import org.exfio.weave.util.Base64;
 
-
 public class Comms {
 
 	public static final String PROTO_VERSION = "1";
@@ -33,17 +33,18 @@ public class Comms {
 	public static final int CLIENT_EPHEMERAL_KEYS_NUM = 10;
 		
 	//Client config
-	public static final String KEY_CLIENT_CONFIG_CLIENTID       = "clientid";
-	public static final String KEY_CLIENT_CONFIG_NAME           = "name";
-	public static final String KEY_CLIENT_CONFIG_PUBLIC_KEY     = "publickey";
-	public static final String KEY_CLIENT_CONFIG_PRIVATE_KEY    = "privatekey";
-	public static final String KEY_CLIENT_CONFIG_AUTHLEVEL      = "authlevel";
+	//public static final String KEY_CLIENT_CONFIG_CLIENTID       = "clientid";
+	//public static final String KEY_CLIENT_CONFIG_NAME           = "name";
+	//public static final String KEY_CLIENT_CONFIG_PUBLIC_KEY     = "publickey";
+	//public static final String KEY_CLIENT_CONFIG_PRIVATE_KEY    = "privatekey";
+	//public static final String KEY_CLIENT_CONFIG_AUTHLEVEL      = "authlevel";
 
 	
 	private WeaveClient wc;
 	private Connection db;
 	private CommsApiV1 commsApi;
 	
+	@Getter private Client clientSelf;
 	@Getter private String clientId;
 	@Getter private String clientName;
 	@Getter private KeyPair identityKeyPair;
@@ -77,11 +78,19 @@ public class Comms {
 
 		//load client info from local storage
 		try {
+			clientSelf = CommsStorage.getClientSelf(db);
+			clientId   = clientSelf.getClientId();
+			clientName = clientSelf.getClientName();
+			identityPrivateKey = clientSelf.getPrivateKey();
+			identityPublicKey  = clientSelf.getPublicKey();
+			
+			/*
 			this.clientId   = CommsStorage.getProperty(db, KEY_CLIENT_CONFIG_CLIENTID);
 			this.clientName = CommsStorage.getProperty(db, KEY_CLIENT_CONFIG_NAME);
 			
 			identityPrivateKey = CommsStorage.getProperty(db, KEY_CLIENT_CONFIG_PRIVATE_KEY);
-			identityPublicKey  = CommsStorage.getProperty(db, KEY_CLIENT_CONFIG_PUBLIC_KEY);						
+			identityPublicKey  = CommsStorage.getProperty(db, KEY_CLIENT_CONFIG_PUBLIC_KEY);
+			*/						
 		} catch (SQLException e) {
 			throw new AssertionError("Couldn't load client config from local storage - " + e.getMessage());			
 		}
@@ -94,6 +103,49 @@ public class Comms {
 		}
 	}
 
+	public void initServer() throws WeaveException {
+
+		commsApi.initServer(PROTO_VERSION);
+		
+		/*
+		//Cleanup exfioclient collection
+		List<Client> clients = new ArrayList<Client>(Arrays.asList(commsApi.getClients()));
+		Iterator<Client> iter = clients.listIterator();
+		while ( iter.hasNext() ) {
+			Client client = iter.next();
+			
+			try {
+				commsApi.deleteClient(client.getClientId());
+			} catch (NotFoundException e) {
+				Log.getInstance().warn(String.format("Couldn't delete client '%s' - not found", client.getClientId()));
+			}
+			
+		}
+		
+		//Cleanup exfiomessage collection
+		List<String> msgIds = new ArrayList<String>();
+		try {
+			msgIds = new ArrayList<String>(Arrays.asList(commsApi.getMessageIds(null)));
+		} catch (NotFoundException e) {
+			//No messages found
+		}
+
+		Iterator<String> iterMsg = msgIds.listIterator();
+		while ( iterMsg.hasNext() ) {
+			String msgId = iterMsg.next();
+			
+			try {
+				commsApi.deleteMessage(msgId);
+			} catch (NotFoundException e) {
+				Log.getInstance().warn(String.format("Couldn't delete message '%s' - not found", msgId));
+			}
+			
+		}		
+
+		//TODO - cleanup other collections or WBOs?
+		*/
+	}
+	
 	public EphemeralKey getEphemeralKey(String cId, String keyId) throws WeaveException {
 		try {
 			return CommsStorage.getEphemeralKey(db, cId, keyId);
@@ -135,12 +187,6 @@ public class Comms {
 		//Generate client id
 		clientId   = wc.generateWeaveID();
 		clientName = name;
-		try {
-			CommsStorage.setProperty(db, KEY_CLIENT_CONFIG_CLIENTID, clientId);
-			CommsStorage.setProperty(db, KEY_CLIENT_CONFIG_NAME, clientName);
-		} catch (SQLException e) {
-			throw new WeaveException("Couldn't save client config - " + e.getMessage());
-		}
 		
 		//Generate ECDH keypair
 		ECDH ecdh = new ECDH();
@@ -148,25 +194,19 @@ public class Comms {
 		
 		identityPublicKey  = Base64.encodeBase64String(identityKeyPair.getPublic().getEncoded());
         identityPrivateKey = Base64.encodeBase64String(identityKeyPair.getPrivate().getEncoded());
-		try {
-			CommsStorage.setProperty(db, KEY_CLIENT_CONFIG_PUBLIC_KEY, identityPublicKey);
-			CommsStorage.setProperty(db, KEY_CLIENT_CONFIG_PRIVATE_KEY, identityPrivateKey);
-		} catch (SQLException e) {
-			throw new WeaveException("Couldn't save client config - " + e.getMessage());
-		}
 
         //Create client record for self
-        Client cl = new Client();
-        cl.setClientId(clientId);
-        cl.setSelf(true);
-        cl.setClientName(clientName);
-		cl.setPublicKey(identityPublicKey);
-		cl.setPrivateKey(identityPrivateKey);
-        cl.setStatus(isAuthorised ? "authorised" : "pending");
-        cl.setAuthLevel("all");
-		cl.setVersion(PROTO_VERSION);
+        clientSelf = new Client();
+        clientSelf.setClientId(clientId);
+        clientSelf.setSelf(true);
+        clientSelf.setClientName(clientName);
+		clientSelf.setPublicKey(identityPublicKey);
+		clientSelf.setPrivateKey(identityPrivateKey);
+        clientSelf.setStatus(isAuthorised ? "authorised" : "pending");
+        clientSelf.setAuthLevel("all");
+		clientSelf.setVersion(PROTO_VERSION);
 		try {
-			CommsStorage.createClient(db, cl);
+			CommsStorage.createClient(db, clientSelf);
 		} catch (SQLException e) {
 			throw new WeaveException("Couldn't create client record - " + e.getMessage());
 		}
@@ -190,6 +230,14 @@ public class Comms {
 		}
 	}
 
+	public void deleteProperty(String key) throws WeaveException {
+		try {
+			CommsStorage.deleteProperty(db, key);
+		} catch (SQLException e) {
+			throw new WeaveException(e);
+		}
+	}
+
 	public Client getClient(String clientId) throws WeaveException {
 		try {
 			return CommsStorage.getClient(db, clientId);
@@ -208,36 +256,30 @@ public class Comms {
 
 	public void updateClient() throws WeaveException {
 		Log.getInstance().debug("updateClient()");
-
-		//First load client and ephemeral keys from local storage
-		Client client = null;
+		
+		
+		//List<EphemeralKey> ephemeralKeys = clientSelf.getEphemeralKeys();
+		List<EphemeralKey> ephemeralKeys = null;
 		try {
-			client = CommsStorage.getClient(db, clientId);
+			ephemeralKeys = new ArrayList<EphemeralKey>(Arrays.asList(CommsStorage.getClientEphemeralKeys(db, clientId)));
 		} catch (SQLException e) {
-			throw new WeaveException(String.format("Couldn't load client '%s' from local storage - %s", clientId, e.getMessage()));
+			throw new WeaveException(String.format("Couldn't load ephemeral keys for client '%s'", clientId));
 		}
 		
-		EphemeralKey[] clientEKeys = null;
-		try {
-			clientEKeys = CommsStorage.getClientEphemeralKeys(db, clientId);
-		} catch (SQLException e) {
-			throw new WeaveException(String.format("Couldn't load ephemeral keys for client '%s' from local storage - %s", clientId, e.getMessage()));
-		}
-		
-		
-		//Remove keys that are not published
-		List<EphemeralKey> newEKeys = new ArrayList<EphemeralKey>();
-				
-		for ( int i = 0; i < clientEKeys.length; i++ ) {
-			if ( clientEKeys[i].getStatus().equals("published") ) {
-				newEKeys.add(clientEKeys[i]);
+		//Only published keys are synced with server
+		List<EphemeralKey> publishedKeys = new ArrayList<EphemeralKey>();
+		Iterator<EphemeralKey> iter = ephemeralKeys.listIterator();
+		while ( iter.hasNext() ) {
+			EphemeralKey eKey = iter.next();
+			if ( eKey.getStatus().equals("published") ) {
+				publishedKeys.add(eKey);
 			}
 		}
 		
 		ECDH ecdh = new ECDH();
 		
 		//Create additional keys if required
-		while ( newEKeys.size() < CLIENT_EPHEMERAL_KEYS_NUM ) {
+		while ( publishedKeys.size() < CLIENT_EPHEMERAL_KEYS_NUM ) {
 			
 			//Generate new ephemeral key
 			String ephemeralKeyId = wc.generateWeaveID();
@@ -251,19 +293,31 @@ public class Comms {
 	        eKey.setPublicKey(ephemeralPublicKey);
 	        eKey.setPrivateKey(ephemeralPrivateKey);
 	        eKey.setStatus("published");
-	        try {
-	        	CommsStorage.createEphemeralKey(db, clientId, eKey);
-	        } catch (SQLException e) {
-	        	throw new WeaveException("Couldn't save ephemeral key - " + e.getMessage());
-	        }
 
-	        newEKeys.add(eKey);
+	        ephemeralKeys.add(eKey);
+	        publishedKeys.add(eKey);
+		}
+
+		//Save client and updated list of ephemeral keys
+		clientSelf.setEphemeralKeys(ephemeralKeys);
+		try {
+			CommsStorage.updateClient(db, clientSelf);
+		} catch (SQLException e) {
+			throw new WeaveException(String.format("Couldn't save client '%s' to local storage - %s", clientId, e.getMessage()));
 		}
 		
-		client.setEphemeralKeys(newEKeys);
-		
-		commsApi.putClient(client);
+		//Re-load client from local storage and add only published keys
+		Client client = null;
+		try {
+			client = CommsStorage.getClient(db, clientId);
+		} catch (SQLException e) {
+			throw new WeaveException(String.format("Couldn't load client '%s' from local storage - %s", clientId, e.getMessage()));
+		}
 
+		//Sync client and published ephemeral keys with server
+		client.setEphemeralKeys(publishedKeys);
+		commsApi.putClient(client);
+		
 		updateOtherClients();
 	}
 	
@@ -276,7 +330,7 @@ public class Comms {
 			
 			if ( clients[i].getClientId().equals(clientId) ) {
 				//Ignore our own client record
-				Log.getInstance().info(String.format("Client '%s' (%s) is self. Skipping...", clients[i].getClientName(), clients[i].getClientId()));
+				Log.getInstance().debug(String.format("Client '%s' (%s) is self. Skipping...", clients[i].getClientName(), clients[i].getClientId()));
 				continue;
 			}
 			try {
@@ -471,7 +525,7 @@ public class Comms {
         ekey.setPrivateKey(ephemeralPrivateKey);
         ekey.setStatus("provisioned");
 		try {
-	        CommsStorage.createEphemeralKey(db, otherClientId, ekey);
+	        CommsStorage.createEphemeralKey(db, clientId, ekey);
 		} catch (SQLException e) {
 			throw new WeaveException(String.format("Couldn't create ephemeral key '%s'", ephemeralKeyId));
 		}
@@ -509,15 +563,44 @@ public class Comms {
 		return sess;
 	}
 
-	public Double sendMessage(Message msg) throws WeaveException {
+	public void updateMessageSession(String sessionId, String state) throws WeaveException {
 		try {
-			CommsStorage.createMessage(db, msg);
+			CommsStorage.updateMessageSession(db, sessionId, state);
+		} catch (SQLException e) {
+			throw new WeaveException(String.format("Couldn't update message session '%s'", sessionId));
+		}
+	}
+
+	public Double sendMessage(Message msg) throws WeaveException {
+		int msgId;
+				
+		try {
+			msgId = CommsStorage.createMessage(db, msg);
 		} catch (SQLException e) {
 			throw new WeaveException(e);
 		}
-		return commsApi.putMessage(msg.getEncodedMessage());
+		
+		Double modified = commsApi.putMessage(msg.getEncodedMessage());
+		
+		//Set message isread to true and session state to requestsent
+		try {
+			CommsStorage.updateMessage(db, msgId, true, false);
+			
+			if ( msg.getSession().getState().equals("requestpending") ) {
+				CommsStorage.updateMessageSession(db, msg.getMessageSessionId(), "requestsent");
+			} else if ( msg.getSession().getState().equals("responsepending") ) {
+				CommsStorage.updateMessageSession(db, msg.getMessageSessionId(), "responsesent");				
+			} else {
+				CommsStorage.updateMessageSession(db, msg.getMessageSessionId(), "messagesent");				
+			}
+		} catch (SQLException e) {
+			throw new WeaveException(e);
+		}
+		
+		return modified;
 	}
 
+	@SuppressWarnings("unused")
 	private boolean validateMessageSession(Message msg) throws WeaveException {	
 		return validateMessageSession(msg, getMessageSession(msg.getMessageSessionId()));
 	}

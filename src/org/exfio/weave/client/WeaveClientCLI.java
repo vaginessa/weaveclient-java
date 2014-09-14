@@ -27,6 +27,10 @@ public class WeaveClientCLI {
 	public static final String CONFIG_GLOBAL_FILE  = "exfioweave";
 	public static final String CONFIG_CLIENT_FILE  = "account";
 
+	public static final String KEY_ACCOUNT_CONFIG_SERVER   = "server";
+	public static final String KEY_ACCOUNT_CONFIG_USERNAME = "username";
+	public static final String KEY_ACCOUNT_CONFIG_SYNCKEY  = "synckey";
+
 	//**********************************
 	// CLI interface and helper methods
 	//**********************************
@@ -259,9 +263,9 @@ public class WeaveClientCLI {
 				File clientConfig = buildAccountConfigPathForKey(configKey);			
 				Properties clientProp = new Properties();
 				
-				clientProp.setProperty("server", clientParams.baseURL);
-				clientProp.setProperty("username", clientParams.user);
-				clientProp.setProperty("synckey", clientParams.syncKey);
+				clientProp.setProperty(KEY_ACCOUNT_CONFIG_SERVER, clientParams.baseURL);
+				clientProp.setProperty(KEY_ACCOUNT_CONFIG_USERNAME, clientParams.user);
+				clientProp.setProperty(KEY_ACCOUNT_CONFIG_SYNCKEY, clientParams.syncKey);
 				
 				try {
 					clientConfig.getParentFile().mkdirs();
@@ -319,8 +323,8 @@ public class WeaveClientCLI {
 			}
 
 			//Set host and credential details from config file
-			baseURL  = clientProp.getProperty("server");
-			username = clientProp.getProperty("username");
+			baseURL  = clientProp.getProperty(KEY_ACCOUNT_CONFIG_SERVER);
+			username = clientProp.getProperty(KEY_ACCOUNT_CONFIG_USERNAME);
 			
 		} else {
 			
@@ -372,7 +376,7 @@ public class WeaveClientCLI {
 			
 			if ( cmd.hasOption('f') || cmd.hasOption('a') ) {
 				//Get synckey from config file
-				synckey = clientProp.getProperty("synckey", null);
+				synckey = clientProp.getProperty(KEY_ACCOUNT_CONFIG_SYNCKEY, null);
 			} else {
 				//Get synckey from command line
 				synckey = cmd.getOptionValue('k', null);				

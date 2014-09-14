@@ -3,7 +3,6 @@ package org.exfio.weave.ext.clientauth;
 import org.exfio.weave.WeaveException;
 import org.exfio.weave.ext.comm.Message;
 import org.json.simple.JSONObject;
-import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
 import lombok.Data;

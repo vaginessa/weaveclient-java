@@ -1,7 +1,6 @@
 package org.exfio.weave.client;
 
 import lombok.Data;
-import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.AccessLevel;

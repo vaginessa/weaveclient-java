@@ -23,6 +23,8 @@ public abstract class WeaveClient {
 	public abstract AccountParams getClientParams();
 
 	public abstract String generateWeaveID();
+	
+	public abstract boolean isAuthorised();
 
 	public abstract WeaveBasicObject decryptWeaveBasicObject(WeaveBasicObject wbo, String collection) throws WeaveException;
 
