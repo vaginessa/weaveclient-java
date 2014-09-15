@@ -29,7 +29,7 @@ public class PayloadCipher {
 		String cleartext         = null;
 		JSONObject encryptObject = null;
 		
-        // Parse JSON encoded payload
+        // Parse JSONUtils encoded payload
 		try {
 			JSONParser parser = new JSONParser();			
 			encryptObject = (JSONObject)parser.parse(payload);  
@@ -159,7 +159,7 @@ public class PayloadCipher {
 
 		Log.getInstance().info( "Successfully encrypted v5 data record");
 
-        // Construct JSON encoded payload
+        // Construct JSONUtils encoded payload
 		JSONObject encryptObject = new JSONObject();
 		
 		encryptObject.put("ciphertext", ciphertext);

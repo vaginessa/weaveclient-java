@@ -88,7 +88,7 @@ public class CommsApiV1 {
 		}
 		payloadClient.put(KEY_CLIENT_HMAC, hmac);			
 
-		//Build ephemeral keys JSON
+		//Build ephemeral keys JSONUtils
 		JSONArray jsonEKeys = new JSONArray();
 
 		Iterator<EphemeralKey> iter = client.getEphemeralKeys().listIterator(); 

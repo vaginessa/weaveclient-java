@@ -280,7 +280,7 @@ public class WeaveClientV5 extends WeaveClient {
             // Recursively call decrypt to extract key data
             String payload = this.decrypt(res.getPayload(), null);
             
-            // Parse JSON encoded payload
+            // Parse JSONUtils encoded payload
             JSONParser parser = new JSONParser();
             JSONObject keyData = null; 
             		

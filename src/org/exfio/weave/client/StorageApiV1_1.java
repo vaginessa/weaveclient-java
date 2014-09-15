@@ -31,15 +31,14 @@ import org.apache.http.impl.client.BasicAuthCache;
 import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.util.EntityUtils;
-
 import org.json.simple.JSONObject;
 import org.json.simple.JSONArray;
 import org.json.simple.parser.JSONParser;  
 import org.json.simple.parser.ParseException;
-
 import org.exfio.weave.WeaveException;
 import org.exfio.weave.client.WeaveClientFactory.ApiVersion;
 import org.exfio.weave.net.HttpException;
+import org.exfio.weave.util.JSONUtils;
 import org.exfio.weave.util.Log;
 import org.exfio.weave.util.URIUtils;
 
@@ -101,7 +100,7 @@ public class StorageApiV1_1 extends StorageApi {
 		while ( itCol.hasNext() ) {
 			String collection = itCol.next();
 			WeaveCollectionInfo wcolInfo = new WeaveCollectionInfo(collection);
-			wcolInfo.modified = (Double)jsonObject.get(collection);
+			wcolInfo.modified = JSONUtils.toDouble(jsonObject.get(collection));
 			wcols.put(collection, wcolInfo);
 		}
 
@@ -141,7 +140,7 @@ public class StorageApiV1_1 extends StorageApi {
 			while ( itUsage.hasNext() ) {
 				String collection = itUsage.next();
 				if ( wcols.containsKey(collection) ) {
-					wcols.get(collection).usage = (Double)jsonObject.get(collection);
+					wcols.get(collection).usage = JSONUtils.toDouble(jsonObject.get(collection));
 				} else {
 					//quietly do nothing
 					//throw new WeaveException(String.format("Collection '%s' not in info/collections", collection));
@@ -167,10 +166,10 @@ public class StorageApiV1_1 extends StorageApi {
 		
 		JSONObject jsonObject = getJSONPayload(location);
 
-		//parse request content to extract JSON encoded WeaveBasicObject
+		//parse request content to extract JSONUtils encoded WeaveBasicObject
 		try {
 			String id         = (String)jsonObject.get("id");
-			Double modified   = (Double)jsonObject.get("modified");
+			Double modified   = JSONUtils.toDouble(jsonObject.get("modified"));
 			Long sortindex    = (Long)jsonObject.get("sortindex");
 			String payload    = (String)jsonObject.get("payload");
 			Long ttl          = (Long)jsonObject.get("ttl");
@@ -199,7 +198,7 @@ public class StorageApiV1_1 extends StorageApi {
 			response    = httpClient.execute(get);
 			checkResponse(response);
 			
-			//parse request content to extract JSON encoded WeaveBasicObject
+			//parse request content to extract JSONUtils encoded WeaveBasicObject
 			JSONParser parser = new JSONParser();  
 			BufferedReader br = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
 			if ( isArray ) {
@@ -304,7 +303,7 @@ public class StorageApiV1_1 extends StorageApi {
 		
 		List<String> ids = new LinkedList<String>();
 		
-		//Get JSON payload and extract JSON array
+		//Get JSONUtils payload and extract JSONUtils array
 		JSONObject jsonTmp = getJSONPayload(location, true);
 		JSONArray jsonArray = (JSONArray)jsonTmp.get(null);
 
@@ -332,7 +331,7 @@ public class StorageApiV1_1 extends StorageApi {
 		
 		List<WeaveBasicObject> listWbo = new LinkedList<WeaveBasicObject>();
 
-		//Get JSON payload and extract JSON array
+		//Get JSONUtils payload and extract JSONUtils array
 		JSONObject jsonTmp = getJSONPayload(location, true);
 		JSONArray jsonArray = (JSONArray)jsonTmp.get(null);
 
@@ -344,7 +343,7 @@ public class StorageApiV1_1 extends StorageApi {
 				JSONObject jsonObject = (JSONObject)iterator.next();
 				
 				String id         = (String)jsonObject.get("id");
-				Double modified   = (Double)jsonObject.get("modified");
+				Double modified   = JSONUtils.toDouble(jsonObject.get("modified"));
 				Long sortindex    = (Long)jsonObject.get("sortindex");
 				String payload    = (String)jsonObject.get("payload");
 				Long ttl          = (Long)jsonObject.get("ttl");

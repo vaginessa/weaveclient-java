@@ -144,7 +144,7 @@ public class WeaveClientCLI {
 		options.addOption("c", "collection", true, "collection");
 		options.addOption("i", "id", true, "object ID");
 		options.addOption("t", "plaintext", false, "do not encrypt/decrypt item");
-		options.addOption("m", "modify", true, "update item with given value in JSON format. Requires -c and -i");
+		options.addOption("m", "modify", true, "update item with given value in JSONUtils format. Requires -c and -i");
 		options.addOption("d", "delete", false, "delete item. Requires -c and -i");
 		options.addOption("n", "info", false, "get collection info. Requires -c");
 		options.addOption("l", "log-level", true, "set log level (trace|debug|info|warn|error)");
