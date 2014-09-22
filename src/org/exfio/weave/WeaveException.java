@@ -11,4 +11,7 @@ public class WeaveException extends Exception {
 		super(throwable);
 	}
 
+	public WeaveException(String message, Throwable throwable) {
+		super(message, throwable);
+	}
 }

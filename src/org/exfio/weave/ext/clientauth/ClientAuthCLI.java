@@ -13,6 +13,7 @@ import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
+import org.exfio.weave.AccountNotFoundException;
 import org.exfio.weave.WeaveException;
 import org.exfio.weave.client.WeaveClient;
 import org.exfio.weave.client.WeaveClientCLI;
@@ -27,11 +28,11 @@ public class ClientAuthCLI {
 
 	public static final String binName = "weaveauth";
 	
-	public static File buildAccountDatabasePath() throws IOException {
+	public static File buildAccountDatabasePath() throws IOException, AccountNotFoundException {
 		return buildAccountDatabasePath(null);
 	}
 
-	public static File buildAccountDatabasePath(String accountName) throws IOException {
+	public static File buildAccountDatabasePath(String accountName) throws IOException, AccountNotFoundException {
 		//Get path to database file for accountName
 		String configKey = WeaveClientCLI.getAccountConfigKey(accountName);
 		return buildAccountDatabasePathForKey(configKey);
@@ -149,6 +150,9 @@ public class ClientAuthCLI {
 				clientDatabase = buildAccountDatabasePath();
 			}
 		} catch (IOException e) {
+			System.err.println(e.getMessage());
+			System.exit(1);
+		} catch (AccountNotFoundException e) {
 			System.err.println(e.getMessage());
 			System.exit(1);
 		}

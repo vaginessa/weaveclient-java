@@ -15,6 +15,7 @@ import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
+import org.exfio.weave.AccountNotFoundException;
 import org.exfio.weave.WeaveException;
 import org.exfio.weave.client.WeaveClient;
 import org.exfio.weave.util.Log;
@@ -41,21 +42,21 @@ public class WeaveClientCLI {
 		return new File(configPath, "exfioweave.properties");
 	}
 
-	public static File buildAccountConfigPath() throws IOException {
+	public static File buildAccountConfigPath() throws IOException, AccountNotFoundException {
 		return buildAccountConfigPath(null);
 	}
 	
-	public static File buildAccountConfigPath(String accountName) throws IOException {
+	public static File buildAccountConfigPath(String accountName) throws IOException, AccountNotFoundException {
 		//Get path to config file for accountName
 		String configKey = getAccountConfigKey(accountName);
 		return buildAccountConfigPathForKey(configKey);
 	}
 
-	public static String getAccountConfigKey() throws IOException {
+	public static String getAccountConfigKey() throws IOException, AccountNotFoundException {
 		return getAccountConfigKey(null);
 	}
 	
-	public static String getAccountConfigKey(String accountName) throws IOException {
+	public static String getAccountConfigKey(String accountName) throws IOException, AccountNotFoundException {
 		//Get configKey for accountName
 
 		if ( accountName == null ) {
@@ -72,9 +73,13 @@ public class WeaveClientCLI {
 			throw new IOException(String.format("Couldn't load global config file '%s'", globalFile.getAbsolutePath()));
 		}
 
-		String configKey = globalProp.getProperty("account." + accountName);
+		String propName = "account." + accountName;
 		
-		return configKey;
+		if ( !globalProp.containsKey(propName) ) {
+			throw new AccountNotFoundException(String.format("Couldn't find account settings for '%s'", accountName));
+		}
+		
+		return globalProp.getProperty(propName);
 	}
 
 	public static File buildAccountConfigPathForKey(String configKey) {
@@ -83,22 +88,22 @@ public class WeaveClientCLI {
 		return new File(configPath, String.format("%s.%s.properties", WeaveClientCLI.CONFIG_CLIENT_FILE, configKey));
 	}
 
-	public static Properties loadAccountConfig() throws IOException {
+	public static Properties loadAccountConfig() throws IOException, AccountNotFoundException {
 		return loadAccountConfig(null);
 	}
 	
-	public static Properties loadAccountConfig(String accountName) throws IOException {
+	public static Properties loadAccountConfig(String accountName) throws IOException, AccountNotFoundException {
 		File configFile = buildAccountConfigPath(accountName);
 		Properties prop = new Properties();
 		prop.load(new FileInputStream(configFile));
 		return prop;
 	}
 
-	public static void writeAccountConfig(Properties prop) throws IOException {
+	public static void writeAccountConfig(Properties prop) throws IOException, AccountNotFoundException {
 		writeAccountConfig(prop, null);
 	}
 
-	public static void writeAccountConfig(Properties prop, String accountName) throws IOException {
+	public static void writeAccountConfig(Properties prop, String accountName) throws IOException, AccountNotFoundException {
 		//Build path to config file
 		File configFile = buildAccountConfigPath(accountName);
 		configFile.getParentFile().mkdirs();
@@ -319,6 +324,9 @@ public class WeaveClientCLI {
 				clientProp.load(new FileInputStream(clientConfig));
 				
 			} catch (IOException e) {
+				System.err.println(String.format("Couldn't load client config - %s", e.getMessage()));
+				System.exit(1);
+			} catch (AccountNotFoundException e) {
 				System.err.println(String.format("Couldn't load client config - %s", e.getMessage()));
 				System.exit(1);
 			}
