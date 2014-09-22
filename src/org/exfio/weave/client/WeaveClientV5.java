@@ -38,6 +38,7 @@ public class WeaveClientV5 extends WeaveClient {
 	public static final String KEY_META_COLLECTION   = "meta";
 	public static final String KEY_META_ID           = "global";
 	
+	private WeaveClientV5Params account;
 	private StorageApi storageClient;
 	private AccountApi regClient;
 	private String user;
@@ -48,6 +49,7 @@ public class WeaveClientV5 extends WeaveClient {
 	public WeaveClientV5() {
 		super();
 		version        = StorageVersion.v5;
+		account        = null;
 		storageClient  = null;
 		regClient      = null;
 		user           = null;
@@ -56,24 +58,15 @@ public class WeaveClientV5 extends WeaveClient {
 		bulkKeys       = null;
 	}
 
-	public AccountParams register(AccountParams params) throws WeaveException {
+	public void register(AccountParams params) throws WeaveException {
 		RegistrationParams p = (RegistrationParams)params;
 		register(p.baseURL, p.user, p.password, p.email);
-		
-		WeaveClientV5Params pnew = new WeaveClientV5Params();
-		pnew.baseURL = p.baseURL;
-		pnew.user    = p.user;
-		pnew.syncKey = syncKey;
-		
-		return pnew;
 	}
 
 	public void register(String baseURL, String user, String password, String email) throws WeaveException {
-		register(baseURL, user, password, email, WeaveClientFactory.ApiVersion.v1_1);		
-	}
-
-	public void register(String baseURL, String user, String password, String email, WeaveClientFactory.ApiVersion apiVersion) throws WeaveException {
 		this.user            = user;
+		this.privateKey      = null;
+		this.bulkKeys        = null;
 
 		//TODO - handle captcha
 		
@@ -85,7 +78,15 @@ public class WeaveClientV5 extends WeaveClient {
 		storageClient = new StorageApiV1_1();
 		storageClient.init(regClient.getStorageUrl(), user, password);
 
+		//Generate new synckey and initialise server meta data
 		initServer();
+		
+		//Store account params
+		account = new WeaveClientV5Params();
+		account.baseURL  = baseURL;
+		account.user     = user;
+		account.password = password;
+		account.syncKey  = this.syncKey;
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -144,15 +145,11 @@ public class WeaveClientV5 extends WeaveClient {
 
 	
 	public void init(AccountParams params) throws WeaveException {
-		WeaveClientV5Params p = (WeaveClientV5Params)params;
-		init(p.baseURL, p.user, p.password, p.syncKey);
+		account = (WeaveClientV5Params)params;
+		init(account.baseURL, account.user, account.password, account.syncKey);
 	}
 
 	public void init(String baseURL, String user, String password, String syncKey) throws WeaveException {
-		init(baseURL, user, password, syncKey, WeaveClientFactory.ApiVersion.v1_1);
-	}
-
-	public void init(String baseURL, String user, String password, String syncKey, WeaveClientFactory.ApiVersion apiVersion) throws WeaveException {
 		this.user            = user;
 		this.syncKey         = syncKey;
 		this.privateKey      = null;
@@ -163,24 +160,21 @@ public class WeaveClientV5 extends WeaveClient {
 		regClient.init(baseURL, user, password);
 		storageClient = new StorageApiV1_1();
 		storageClient.init(regClient.getStorageUrl(), user, password);
+		
+		//Store account params
+		account = new WeaveClientV5Params();
+		account.baseURL  = baseURL;
+		account.user     = user;
+		account.password = password;
+		account.syncKey  = syncKey;
 	}
 
 	public StorageApi getApiClient() {
 		return storageClient;
 	}
 	
-	public void setApiClient(StorageApi weaveApiClient) {
-		this.storageClient = weaveApiClient;
-	}
-
 	public AccountParams getClientParams() {
-		WeaveClientV5Params params = new WeaveClientV5Params();
-		params.baseURL  = null; //FIXME - get from API client
-		params.user     = this.user;
-		params.password = null;
-		params.syncKey  = this.syncKey;
-		
-		return params;
+		return account;
 	}
 
 	public String generateWeaveID() {

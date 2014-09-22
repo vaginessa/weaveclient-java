@@ -240,7 +240,8 @@ public class WeaveClientCLI {
 				regParams.email    = email;
 				
 				wc = WeaveClientFactory.getInstance(storageVersion);
-				wcParams = wc.register(regParams);
+				wc.register(regParams);
+				wcParams = wc.getClientParams();
 
 			} catch(WeaveException e) {
 				System.err.println(e.getMessage());

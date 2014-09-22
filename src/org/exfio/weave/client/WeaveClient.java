@@ -10,7 +10,7 @@ public abstract class WeaveClient {
 	
 	protected StorageVersion version = null;
 	
-	public abstract AccountParams register(AccountParams params) throws WeaveException;
+	public abstract void register(AccountParams params) throws WeaveException;
 
 	public abstract void init(AccountParams params) throws WeaveException;
 	
