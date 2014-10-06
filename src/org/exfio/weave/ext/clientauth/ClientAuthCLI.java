@@ -216,7 +216,11 @@ public class ClientAuthCLI {
 			
 			try {
 				weaveClient = WeaveClientFactory.getInstance(storageVersion);
-				weaveClient.init(weaveParams);	
+				weaveClient.init(weaveParams);
+				//Initialise meta data if not yet done
+				if ( !weaveClient.isInitialised() ) {
+					weaveClient.initServer();			
+				}				
 			} catch (WeaveException e) {
 				System.err.println(e.getMessage());
 				System.exit(1);
@@ -225,7 +229,7 @@ public class ClientAuthCLI {
 			System.err.println("Storage version not recognised");
 			System.exit(1);
 		}		
-
+		
 		if ( cmd.hasOption('i') ) {
 			//Initialise client
 
@@ -234,7 +238,7 @@ public class ClientAuthCLI {
 			
 			try {			
 				ClientAuth auth = new ClientAuth(weaveClient);
-				auth.initClientAuth(clientName, password, clientDatabase.getPath());
+				auth.initClientAuth(clientName, clientDatabase.getPath());
 			} catch(WeaveException e) {
 				System.err.println(e.getMessage());
 				System.exit(1);
@@ -251,7 +255,7 @@ public class ClientAuthCLI {
 			
 			Log.getInstance().info(String.format("Requesting client auth for client '%s'", clientName));
 
-			try {			
+			try {
 				ClientAuth auth = new ClientAuth(weaveClient);
 				auth.requestClientAuth(clientName, password, clientDatabase.getPath());
 				authCode = auth.getAuthCode();
@@ -280,10 +284,15 @@ public class ClientAuthCLI {
 			
 			try {			
 				ClientAuth auth = new ClientAuth(weaveClient, clientDatabase.getPath());
-				Message[] caMsgs = auth.processClientAuthMessages();
+				
+				//FIXME - Debug only
+				auth.setPbkdf2Iterations(1);
+				auth.setPbkdf2Length(128);
+				
+				Message[] messages = auth.processClientAuthMessages();
 								
-				for (int i = 0; i < caMsgs.length; i++) {
-					ClientAuthRequestMessage caMsg = (ClientAuthRequestMessage)caMsgs[i];
+				for (Message msg: messages) {
+					ClientAuthRequestMessage caMsg = (ClientAuthRequestMessage)msg;
 					
 					if ( caMsg.getClientName().equals(clientName) ) {
 						auth.approveClientAuth(caMsg.getMessageSessionId(), authCode, password);
@@ -385,9 +394,9 @@ public class ClientAuthCLI {
 					String.format(
 						"Client auth request received from '%s'.\n"
 						+ "To approve request use the command\n"
-						+ "%s -o %s -c AUTHCODE\n"
+						+ "%s -o \"%s\" -c AUTHCODE\n"
 						+ "To reject request use the command\n"
-						+ "%s -x %s\n", 
+						+ "%s -x \"%s\"\n", 
 						caMsg.getClientName(),
 						binName,
 						caMsg.getClientName(),						

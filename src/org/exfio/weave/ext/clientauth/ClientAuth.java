@@ -14,7 +14,6 @@ import java.util.ListIterator;
 
 import org.apache.commons.codec.binary.Base32;
 import org.exfio.weave.WeaveException;
-import org.exfio.weave.client.NotFoundException;
 import org.exfio.weave.client.WeaveClient;
 import org.exfio.weave.client.WeaveClientFactory;
 import org.exfio.weave.client.WeaveClientV5Params;
@@ -24,6 +23,7 @@ import org.exfio.weave.ext.comm.Client;
 import org.exfio.weave.ext.comm.Comms;
 import org.exfio.weave.ext.comm.Message;
 import org.exfio.weave.ext.comm.Message.MessageSession;
+import org.exfio.weave.ext.comm.StorageNotFoundException;
 import org.exfio.weave.ext.crypto.PBKDF2;
 import org.exfio.weave.util.Log;
 import org.exfio.weave.util.Base64;
@@ -39,10 +39,17 @@ public class ClientAuth {
 	public static final String KEY_CLIENT_CONFIG_AUTHCODE    = "clientauth.authcode";
 	public static final String KEY_CLIENT_CONFIG_AUTHBY      = "clientauth.authby";
 	public static final String KEY_CLIENT_CONFIG_AUTHSYNCKEY = "clientauth.synckey";
-			
+	
+	//PBKDF2
+	public static final int PBKDF2_DEFAULT_ITERATIONS = 8000;
+	public static final int PBKDF2_DEFAULT_LENGTH     = 128;
+	
 	private WeaveClient wc;
 	private Comms comms;
-		
+
+	@lombok.Getter @lombok.Setter private int pbkdf2Iterations = PBKDF2_DEFAULT_ITERATIONS;
+	@lombok.Getter @lombok.Setter private int pbkdf2Length     = PBKDF2_DEFAULT_LENGTH;
+
 	@lombok.Getter private String authCode;
 	@lombok.Getter private String syncKey;
 	@lombok.Getter private String authStatus;
@@ -73,13 +80,13 @@ public class ClientAuth {
 
 	private void init(WeaveClient wc, Connection db) {
 		this.wc    = wc;
-		this.comms = new Comms(wc, db);		
+		this.comms = new Comms(wc, db);
 		
 		try {
-			authStatus = comms.getProperty(KEY_CLIENT_CONFIG_AUTHSTATUS);
-			authCode   = comms.getProperty(KEY_CLIENT_CONFIG_AUTHCODE);
-			authBy     = comms.getProperty(KEY_CLIENT_CONFIG_AUTHBY);
-			syncKey    = comms.getProperty(KEY_CLIENT_CONFIG_AUTHSYNCKEY);		
+			authStatus = comms.getProperty(KEY_CLIENT_CONFIG_AUTHSTATUS, null);
+			authCode   = comms.getProperty(KEY_CLIENT_CONFIG_AUTHCODE, null);
+			authBy     = comms.getProperty(KEY_CLIENT_CONFIG_AUTHBY, null);
+			syncKey    = comms.getProperty(KEY_CLIENT_CONFIG_AUTHSYNCKEY, null);		
 		} catch (WeaveException e){
 			throw new AssertionError(String.format("Error loading client auth properties - %s", e.getMessage()));
 		}
@@ -87,7 +94,6 @@ public class ClientAuth {
 		java.security.Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());
 	}
 	
-	//FIXME - Password is discarded as soon as it is used hence it is currently not possible to retrieve it from WeaveClient 
 	@SuppressWarnings("unused")
 	private String getWeavePassword() throws WeaveException {
 		String password = null;
@@ -115,13 +121,13 @@ public class ClientAuth {
 	private String generatePasswordHash(String password, byte[] salt) {
 		//Generate 128 bit (16 byte) digest
 		PBKDF2 pbkdf = new PBKDF2();
-		return pbkdf.generatePBKDF2Digest(password, salt, 80000, 128);
+		return pbkdf.generatePBKDF2Digest(password, salt, pbkdf2Iterations, pbkdf2Length);
 	}
 
 	private String generateAuthDigest(String cleartext, byte[] salt) {
 		//Generate 128 bit (16 byte) digest
 		PBKDF2 pbkdf = new PBKDF2();
-		return pbkdf.generatePBKDF2Digest(cleartext, salt, 80000, 128);
+		return pbkdf.generatePBKDF2Digest(cleartext, salt, pbkdf2Iterations, pbkdf2Length);
 	}
 	
 	private String generateAuthCode() {
@@ -212,8 +218,11 @@ public class ClientAuth {
 		return wc.isAuthorised();
 	}
 
-
-	public void initClientAuth(String clientName, String password, String database) throws WeaveException {
+	public boolean isInitialised() throws WeaveException {
+		return comms.isInitialised();
+	}
+	
+	public void initClientAuth(String clientName, String database) throws WeaveException {
 		Log.getInstance().debug("initClientAuth()");
 
 		if ( !isAuthorised() ) {
@@ -301,7 +310,7 @@ public class ClientAuth {
 		Message[] sessMsgs = null;
 		try {
 			sessMsgs = comms.getMessagesBySession(sessionId);
-		} catch (NotFoundException e) {
+		} catch (StorageNotFoundException e) {
 			throw new WeaveException(String.format("Couldn't get messages for session '%s'", sessionId));
 		}
 		if ( sessMsgs.length != 1 ) {
@@ -347,27 +356,7 @@ public class ClientAuth {
 		sendClientAuthResponse(sessionId, false, null, null);
 	}
 	
-	public Message[] processClientAuthMessages() throws WeaveException {
-		Log.getInstance().debug("processClientAuthMessages()");
-
-		comms.checkMessages();
-		
-		List<Message> msgUnread = new ArrayList<Message>(Arrays.asList(comms.getUnreadMessages()));
-
-		Iterator<Message> iterUnread = msgUnread.listIterator();
-		while ( iterUnread.hasNext() ) {
-			Message msg = iterUnread.next();
-			
-			if ( msg.getSession().getState().equals("closed") ) {
-				Log.getInstance().warn(String.format("Message could not be processed - session '%s' is closed:", msg.getMessageSessionId()));
-			}
-			
-			if ( msg.getMessageType().equals(MESSAGE_TYPE_CLIENTAUTHREQUEST) ) {
-				processClientAuthRequest(new ClientAuthRequestMessage(msg));
-			} else if ( msg.getMessageType().equals(MESSAGE_TYPE_CLIENTAUTHRESPONSE) ) {
-				processClientAuthResponse(new ClientAuthResponseMessage(msg));	
-			}
-		}
+	public Message[] getPendingClientAuthMessages() throws WeaveException {
 		
 		List<Message> msgPending = new ArrayList<Message>(Arrays.asList(comms.getPendingMessages(MESSAGE_TYPE_CLIENTAUTHREQUEST)));
 		
@@ -390,6 +379,31 @@ public class ClientAuth {
 			iterPending.set(new ClientAuthRequestMessage(msg));
 		}
 		return msgPending.toArray(new Message[0]);
+	}
+	
+	public Message[] processClientAuthMessages() throws WeaveException {
+		Log.getInstance().debug("processClientAuthMessages()");
+
+		comms.checkMessages();
+		
+		List<Message> msgUnread = new ArrayList<Message>(Arrays.asList(comms.getUnreadMessages()));
+
+		Iterator<Message> iterUnread = msgUnread.listIterator();
+		while ( iterUnread.hasNext() ) {
+			Message msg = iterUnread.next();
+			
+			if ( msg.getSession().getState().equals("closed") ) {
+				Log.getInstance().warn(String.format("Message could not be processed - session '%s' is closed:", msg.getMessageSessionId()));
+			}
+			
+			if ( msg.getMessageType().equals(MESSAGE_TYPE_CLIENTAUTHREQUEST) ) {
+				processClientAuthRequest(new ClientAuthRequestMessage(msg));
+			} else if ( msg.getMessageType().equals(MESSAGE_TYPE_CLIENTAUTHRESPONSE) ) {
+				processClientAuthResponse(new ClientAuthResponseMessage(msg));	
+			}
+		}
+	
+		return getPendingClientAuthMessages();
 	}
 
 	public void processClientAuthResponse(ClientAuthResponseMessage msg) throws WeaveException {

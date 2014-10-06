@@ -141,12 +141,15 @@ public class WeaveClientV5 extends WeaveClient {
 		wboCrypto = encryptWeaveBasicObject(wboCrypto, null);
 
 		storageClient.put(KEY_CRYPTO_PATH, wboCrypto);
+		
+		//Update account params
+		account.syncKey  = this.syncKey;
 	}
 
 	
 	public void init(AccountParams params) throws WeaveException {
-		account = (WeaveClientV5Params)params;
-		init(account.baseURL, account.user, account.password, account.syncKey);
+		WeaveClientV5Params v5params = (WeaveClientV5Params)params;
+		init(v5params.baseURL, v5params.user, v5params.password, v5params.syncKey);
 	}
 
 	public void init(String baseURL, String user, String password, String syncKey) throws WeaveException {
@@ -183,8 +186,34 @@ public class WeaveClientV5 extends WeaveClient {
         return Base64.encodeToString(weaveID, Base64.NO_PADDING | Base64.NO_WRAP | Base64.URL_SAFE);
 	}
 
+	public boolean isInitialised() throws WeaveException {
+		//Default to true as false negative could result in reset
+		boolean meta = true;
+		boolean keys = true;
+		
+		@SuppressWarnings("unused")
+		WeaveBasicObject wboMeta = null;
+		try {
+			wboMeta = storageClient.get(KEY_META_PATH);
+		} catch (NotFoundException e) {
+			meta = false;
+		}
+
+		/*
+		@SuppressWarnings("unused")
+		WeaveBasicObject wboKeys = null;
+		try {
+			wboKeys = storageClient.get(KEY_CRYPTO_PATH) ;
+		} catch (NotFoundException e) {
+			keys = false;
+		}
+		*/
+		
+		return (meta && keys);
+	}
+	
 	public boolean isAuthorised() {
-		return ( syncKey != null ); 
+		return ( syncKey != null && syncKey.length() > 0 ); 
 	}
 	
 	private WeaveKeyPair generateWeaveKeyPair() {

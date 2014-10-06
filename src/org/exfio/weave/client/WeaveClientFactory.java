@@ -1,22 +1,29 @@
 package org.exfio.weave.client;
 
 
-import org.json.simple.JSONObject;
+import lombok.Getter;
+import lombok.Setter;
 
+import org.json.simple.JSONObject;
+import org.exfio.weave.InvalidStorageException;
 import org.exfio.weave.WeaveException;
 import org.exfio.weave.client.WeaveClient;
 import org.exfio.weave.client.WeaveClientV5;
 
 public class WeaveClientFactory {
 	
-	public enum StorageVersion {
+	public static enum StorageVersion {
 		v5;
 	}
 
-	public enum ApiVersion {
+	public static enum ApiVersion {
 		v1_1;
 	}
 
+	
+	@Getter @Setter
+	private static StorageVersion defaultStorageVersion = StorageVersion.v5;
+	
 	public static String storageVersionToString(StorageVersion version) {
 		String versionString = null;
 		switch (version) {
@@ -36,7 +43,7 @@ public class WeaveClientFactory {
 		return storageVersion;
 	}
 
-	public static final StorageVersion autoDiscoverStorageVersion(AccountParams adParams) throws WeaveException {
+	public static final StorageVersion autoDiscoverStorageVersion(AccountParams adParams) throws WeaveException, InvalidStorageException {
 		StorageVersion storageVersion = null;
 		
 		//Initialise registration and storage clients with account details
@@ -49,7 +56,8 @@ public class WeaveClientFactory {
 		try {
 			wbo = storageClient.get(WeaveClientV5.KEY_META_PATH);
 		} catch (NotFoundException e) {
-			throw new WeaveException(WeaveClientV5.KEY_META_PATH + " not found " + e.getMessage());
+			//Storage may be an uninitialised
+			throw new InvalidStorageException(String.format("%s not found - %s", WeaveClientV5.KEY_META_PATH, e.getMessage()));
 		}
 		JSONObject jsonPayload = null;
 		
@@ -79,7 +87,7 @@ public class WeaveClientFactory {
 		return storageVersion;
 	}
 
-	public static final WeaveClient getInstance(AccountParams params) throws WeaveException {
+	public static final WeaveClient getInstance(AccountParams params) throws WeaveException, InvalidStorageException {
 		//return WeaveClient for given parameters
 		WeaveClient weaveClient = null;
 		

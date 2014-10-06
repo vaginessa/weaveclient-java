@@ -242,10 +242,10 @@ public class StorageApiV1_1 extends StorageApi {
 			params.add(new BasicNameValuePair("ids", value));
 		}
 		if (older != null) {
-			params.add(new BasicNameValuePair("older", older.toString()));
+			params.add(new BasicNameValuePair("older", String.format("%.2f", older.doubleValue())));
 		}
 		if (newer != null) {
-			params.add(new BasicNameValuePair("newer", newer.toString()));
+			params.add(new BasicNameValuePair("newer", String.format("%.2f", newer.doubleValue())));
 		}
 		if (index_above != null) {
 			params.add(new BasicNameValuePair("index_above", index_above.toString()));			
@@ -364,7 +364,7 @@ public class StorageApiV1_1 extends StorageApi {
 		jobj.put("id", wbo.id);
 		jobj.put("payload", wbo.payload);
 		if ( wbo.modified != null ) {
-			jobj.put("modified", wbo.modified);
+			jobj.put("modified", String.format("%.2f", wbo.modified));
 		}
 		if ( wbo.sortindex != null ) {
 			jobj.put("sortindex", wbo.sortindex);

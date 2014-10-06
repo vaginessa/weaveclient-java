@@ -24,6 +24,7 @@ import javax.crypto.KeyAgreement;
 import org.exfio.weave.WeaveException;
 import org.exfio.weave.crypto.WeaveKeyPair;
 import org.exfio.weave.util.Base64;
+import org.exfio.weave.util.OSUtils;
 
 public class ECDH {
 
@@ -32,8 +33,7 @@ public class ECDH {
 	private String getCryptoProvider() {
 		if ( cryptoProvider == null ) {
 			String cryptoProviderClass = null;
-			String os = System.getProperty("os.name");
-			if ( os.matches("(?i)android") ) {
+			if ( OSUtils.isAndroid() ) {
 				//On android we need to use Spongy Castle, i.e. SC
 				cryptoProvider      = "SC";
 				cryptoProviderClass = "org.spongycastle.jce.provider.BouncyCastleProvider";

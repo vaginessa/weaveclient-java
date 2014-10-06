@@ -15,11 +15,12 @@ public class AndroidCompat {
 		String prettyname = null;
 		
 		try {
-			Class c  = Class.forName("android.BluetoothAdapter");
-			Method m = c.getDeclaredMethod("getDefaultAdapter", (Class)null);
-			Object o = m.invoke(null, (Class)null);
-			m = c.getDeclaredMethod("getName", (Class)null);  
-		    prettyname = (String)m.invoke(o, (Class)null);
+			Class cBluetoothAdapter  = Class.forName("android.bluetooth.BluetoothAdapter");
+			Method mGetDefaultAdapter = cBluetoothAdapter.getDeclaredMethod("getDefaultAdapter");
+			Method mGetName = cBluetoothAdapter.getDeclaredMethod("getName"); 
+
+			Object o = mGetDefaultAdapter.invoke(null);
+		    prettyname = (String)mGetName.invoke(cBluetoothAdapter.cast(o));
 		} catch (Exception e) {
 			throw new NoSuchMethodException(e.getMessage());
 		}

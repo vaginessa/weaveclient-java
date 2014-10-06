@@ -14,7 +14,6 @@ public abstract class Message {
 		
 	protected int    messageId;
 	protected String sourceClientId;
-	protected String sourceIdentityKey;
 	protected String sourceKeyId;
 	protected String sourceKey;
 	protected String destinationClientId;
@@ -34,7 +33,6 @@ public abstract class Message {
 		
 		this.messageId           = msg.getMessageId();
 		this.sourceClientId      = msg.getSourceClientId();
-		this.sourceIdentityKey   = msg.getSourceIdentityKey();
 		this.sourceKeyId         = msg.getSourceKeyId();
 		this.sourceKey           = msg.getSourceKey();
 		this.destinationClientId = msg.getDestinationClientId();

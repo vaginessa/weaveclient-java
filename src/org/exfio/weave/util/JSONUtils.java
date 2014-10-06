@@ -18,4 +18,10 @@ public final class JSONUtils {
 			throw new AssertionError(String.format("Invalid object type '%s' expected Double or Long", objectVal.getClass()));
 		}		
 	}
+	
+	public static Double unixToJavascriptTime(Long unixTime) {
+		return unixTime.doubleValue() * 1000;
+	}
+
+
 }

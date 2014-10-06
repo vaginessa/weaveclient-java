@@ -32,8 +32,20 @@ public class CommsStorage {
 		DefaultMessageDataMapper.initDB(db, force);		
 	}
 
-	public static String getProperty(Connection db, String key) throws SQLException {
+	public static String getProperty(Connection db, String key, String defaultValue) throws SQLException {
+		try {
+			return PropertyDataMapper.getProperty(db, key);
+		} catch (StorageNotFoundException e) {
+			return defaultValue;
+		}
+	}
+
+	public static String getProperty(Connection db, String key) throws SQLException, StorageNotFoundException {
 		return PropertyDataMapper.getProperty(db, key);
+	}
+
+	public static boolean hasProperty(Connection db, String key) throws SQLException {
+		return PropertyDataMapper.hasProperty(db, key);
 	}
 
 	public static void setProperty(Connection db, String key, String value) throws SQLException {
@@ -44,15 +56,15 @@ public class CommsStorage {
 		PropertyDataMapper.deleteProperty(db, key);
 	}
 
-	public static Client getClient(Connection db, String clientId) throws SQLException {
+	public static Client getClient(Connection db, String clientId) throws SQLException, StorageNotFoundException {
 		return ClientDataMapper.getClient(db, clientId);
 	}
 
-	public static Client getClientByName(Connection db, String clientName) throws SQLException {
+	public static Client getClientByName(Connection db, String clientName) throws SQLException, StorageNotFoundException {
 		return ClientDataMapper.getClientByName(db, clientName);
 	}
 
-	public static Client getClientSelf(Connection db) throws SQLException {
+	public static Client getClientSelf(Connection db) throws SQLException, StorageNotFoundException {
 		return ClientDataMapper.getClientSelf(db);
 	}
 
@@ -140,6 +152,10 @@ public class CommsStorage {
 		DefaultMessageDataMapper.updateMessageSession(db, sessionId, state, sequence, otherSequence);
 	}
 
+    private static ResultSet getGeneratedKeys(Connection db) throws SQLException {
+    	return db.createStatement().executeQuery("select last_insert_rowid();");
+    }
+    
 	//-------------------------------------------
 	// Data Mapper classes
 	//-------------------------------------------
@@ -171,7 +187,7 @@ public class CommsStorage {
 
 		}
 
-		public static String getProperty(Connection db, String key) throws SQLException {
+		public static String getProperty(Connection db, String key) throws SQLException, StorageNotFoundException {
 			
 			String SQL = null;
 			SQL = "SELECT Value FROM Property WHERE Key = ?";
@@ -184,11 +200,26 @@ public class CommsStorage {
 			
 			ResultSet rs = st.executeQuery();
 			if ( !rs.next() ) {
-				return null;
+				throw new StorageNotFoundException(String.format("Value not found for key '%s'", key));
 			}
 			
 			return rs.getString("Value");
+		}
+
+		public static boolean hasProperty(Connection db, String key) throws SQLException {
 			
+			String SQL = null;
+			SQL = "SELECT Value FROM Property WHERE Key = ?";
+					
+			PreparedStatement st = db.prepareStatement(SQL);
+			st.setQueryTimeout(QUERY_TIMEOUT);
+			
+			int col = 1;
+			st.setString(col++, key);
+			
+			ResultSet rs = st.executeQuery();
+
+			return ( (rs != null) && rs.next() );
 		}
 
 		public static void setProperty(Connection db, String key, String value) throws SQLException {
@@ -350,7 +381,7 @@ public class CommsStorage {
 			return client;
 		}
 		
-		public static Client getClient(Connection db, String clientId) throws SQLException {
+		public static Client getClient(Connection db, String clientId) throws SQLException, StorageNotFoundException {
 			
 			String SQL = buildQueryGetClientById(clientId, false);
 					
@@ -359,7 +390,7 @@ public class CommsStorage {
 			
 			ResultSet rs = st.executeQuery();
 			if ( !rs.next() ) {
-				return null;
+				throw new StorageNotFoundException(String.format("Client not found with ClientID '%s'", clientId));
 			}
 			
 			Client client = buildClientFromDB(db, rs);
@@ -367,7 +398,7 @@ public class CommsStorage {
 			return client;
 		}
 
-		public static Client getClientByName(Connection db, String clientName) throws SQLException {
+		public static Client getClientByName(Connection db, String clientName) throws SQLException, StorageNotFoundException {
 			
 			String SQL = buildQueryGetClient(false);
 			
@@ -381,7 +412,7 @@ public class CommsStorage {
 			
 			ResultSet rs = st.executeQuery();
 			if ( !rs.next() ) {
-				return null;
+				throw new StorageNotFoundException(String.format("Client not found with ClientName '%s'", clientName));
 			}
 			
 			Client client = buildClientFromDB(db, rs);
@@ -389,7 +420,7 @@ public class CommsStorage {
 			return client;
 		}
 
-		public static Client getClientSelf(Connection db) throws SQLException {
+		public static Client getClientSelf(Connection db) throws SQLException, StorageNotFoundException {
 			
 			String SQL = buildQueryGetClient(false);
 			
@@ -400,7 +431,7 @@ public class CommsStorage {
 			
 			ResultSet rs = st.executeQuery();
 			if ( !rs.next() ) {
-				return null;
+				throw new StorageNotFoundException(String.format("Client not found with IsSelf '1'"));
 			}
 			
 			Client client = buildClientFromDB(db, rs);
@@ -1050,7 +1081,7 @@ public class CommsStorage {
 	
 			st.executeUpdate();
 			
-			ResultSet generatedKeys = st.getGeneratedKeys();
+			ResultSet generatedKeys = getGeneratedKeys(db);
 			if (generatedKeys.next()) {
 				return generatedKeys.getInt(1);
 			} else {
@@ -1160,24 +1191,28 @@ public class CommsStorage {
 				+ "("
 				+ " MessageSessionID"
 				+ " ,EphemeralKeyID"
+				+ " ,Sequence"
 				+ " ,OtherClientID"
 				+ " ,OtherIdentityKey"
 				+ " ,OtherEphemeralKeyID"
 				+ " ,OtherEphemeralKey"
+				+ " ,OtherSequence"
 				+ " ,State"				
 				+ ")"
 				+ "\n"
-				+ "VALUES(?, ?, ?, ?, ?, ?, ?)";
+				+ "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
 			PreparedStatement st = db.prepareStatement(SQL);
 			st.setQueryTimeout(QUERY_TIMEOUT);		
 			int col = 1;
 			st.setString(col++, session.getSessionId());
 			st.setString(col++, session.getEphemeralKeyId());
+			st.setLong(col++, session.getSequence());
 			st.setString(col++, session.getOtherClientId());
 			st.setString(col++, session.getOtherIdentityKey());
 			st.setString(col++, session.getOtherEphemeralKeyId());
 			st.setString(col++, session.getOtherEphemeralKey());
+			st.setLong(col++, session.getOtherSequence());
 			st.setString(col++, session.getState());
 
 			st.executeUpdate();

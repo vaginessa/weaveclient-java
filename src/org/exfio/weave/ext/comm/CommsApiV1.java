@@ -12,11 +12,11 @@ import org.exfio.weave.WeaveException;
 import org.exfio.weave.client.NotFoundException;
 import org.exfio.weave.client.WeaveBasicObject;
 import org.exfio.weave.client.WeaveClient;
+import org.exfio.weave.client.WeaveClientFactory;
 import org.exfio.weave.crypto.PayloadCipher;
 import org.exfio.weave.crypto.WeaveKeyPair;
 import org.exfio.weave.ext.comm.Client.EphemeralKey;
 import org.exfio.weave.ext.comm.Message.EncodedMessage;
-import org.exfio.weave.ext.comm.Message.MessageSession;
 import org.exfio.weave.ext.crypto.ECDH;
 import org.exfio.weave.ext.crypto.ECKeyPair;
 import org.exfio.weave.util.Log;
@@ -28,6 +28,12 @@ public class CommsApiV1 {
 	
 	public static final int CLIENT_EPHEMERAL_KEYS_NUM    = 10;
 	
+	public static final String KEY_META_PATH            = "meta/exfio";
+	public static final String KEY_META_COLLECTION      = "meta";
+	public static final String KEY_META_ID              = "exfio";
+	public static final String KEY_META_CLIENT_VERSION  = "clientVersion";
+	public static final String KEY_META_MESSAGE_VERSION = "messageVersion";
+
 	//Key data struct
 	public static final String KEY_CRYPTOKEY_KEYID       = "keyid";
 	public static final String KEY_CRYPTOKEY_KEY         = "key";
@@ -46,12 +52,11 @@ public class CommsApiV1 {
 	//Message data struct
 	public static final String KEY_MESSAGE_COLLECTION           = "exfiomessage";
 	public static final String KEY_MESSAGE_VERSION              = "version";
-	public static final String KEY_MESSAGE_SOURCE_CLIENTID      = "aclientid";
-	public static final String KEY_MESSAGE_SOURCE_IDENTITY_KEY  = "aidentitykey";
-	public static final String KEY_MESSAGE_SOURCE_KEYID         = "akeyid";
-	public static final String KEY_MESSAGE_SOURCE_KEY           = "akey";
-	public static final String KEY_MESSAGE_DESTINATION_CLIENTID = "bclientid";
-	public static final String KEY_MESSAGE_DESTINATION_KEYID    = "bkeyid";
+	public static final String KEY_MESSAGE_SOURCE_CLIENTID      = "srcclientid";
+	public static final String KEY_MESSAGE_SOURCE_KEYID         = "srckeyid";
+	public static final String KEY_MESSAGE_SOURCE_KEY           = "srckey";
+	public static final String KEY_MESSAGE_DESTINATION_CLIENTID = "dstclientid";
+	public static final String KEY_MESSAGE_DESTINATION_KEYID    = "dstkeyid";
 	public static final String KEY_MESSAGE_SEQUENCE             = "sequence";
 	public static final String KEY_MESSAGE_TYPE                 = "type";
 	public static final String KEY_MESSAGE_CONTENT              = "content";
@@ -157,9 +162,6 @@ public class CommsApiV1 {
 		//Build message payload
 		msgObject.put(KEY_MESSAGE_VERSION, PROTO_MESSAGE_VERSION);
 		msgObject.put(KEY_MESSAGE_SOURCE_CLIENTID, msg.getSourceClientId());
-		if ( msg.getSourceIdentityKey() != null ) {
-			msgObject.put(KEY_MESSAGE_SOURCE_IDENTITY_KEY, msg.getSourceIdentityKey());
-		}
 		msgObject.put(KEY_MESSAGE_SOURCE_KEYID, msg.getSourceKeyId());
 		msgObject.put(KEY_MESSAGE_SOURCE_KEY, msg.getSourceKey());
 		msgObject.put(KEY_MESSAGE_DESTINATION_CLIENTID, msg.getDestinationClientId());
@@ -183,9 +185,6 @@ public class CommsApiV1 {
 		
 		msg.setVersion((String)payload.get(KEY_MESSAGE_VERSION));
 		msg.setSourceClientId((String)payload.get(KEY_MESSAGE_SOURCE_CLIENTID));
-		if ( payload.containsKey(KEY_MESSAGE_SOURCE_IDENTITY_KEY) ) {
-			msg.setSourceIdentityKey((String)payload.get(KEY_MESSAGE_SOURCE_IDENTITY_KEY));
-		}
 		msg.setSourceKeyId((String)payload.get(KEY_MESSAGE_SOURCE_KEYID));
 		msg.setSourceKey((String)payload.get(KEY_MESSAGE_SOURCE_KEY));
 		msg.setDestinationClientId((String)payload.get(KEY_MESSAGE_DESTINATION_CLIENTID));
@@ -266,18 +265,6 @@ public class CommsApiV1 {
 		return true;
 	}
 	
-	private static MessageSession getIncomingMessageSession(Message msg) throws WeaveException{
-		
-		MessageSession session = new MessageSession();
-		session.setEphemeralKeyId(msg.getDestinationKeyId());
-		session.setOtherClientId(msg.getSourceClientId());
-		session.setOtherIdentityKey(msg.getSourceIdentityKey());
-		session.setOtherEphemeralKeyId(msg.getSourceKeyId());
-		session.setOtherEphemeralKey(msg.getSourceKey());
-		
-		return session;
-	}
-
 	@SuppressWarnings("unused")
 	private EncodedMessage decryptMessage(EncodedMessage msg, ECKeyPair clientKeyPair, ECKeyPair ephemeralKeyPair) throws WeaveException {
 		try {
@@ -337,7 +324,23 @@ public class CommsApiV1 {
 		PayloadCipher cipher = new PayloadCipher();
 		return cipher.encrypt(plaintext, keyPair);
 	}
+	
+	public boolean isInitialised() throws WeaveException {
+		//Default to true as false negative could result in reset
+		boolean meta = true;
+		
+		@SuppressWarnings("unused")
+		WeaveBasicObject wboMeta = null;
+		try {
+			wboMeta = wc.get(KEY_META_COLLECTION, KEY_META_ID);
+		} catch (NotFoundException e) {
+			meta = false;
+		}
+		
+		return meta;
+	}
 
+	@SuppressWarnings("unchecked")
 	public void initServer(String version) throws WeaveException {
 		Log.getInstance().debug("initSever()");
 		
@@ -354,7 +357,16 @@ public class CommsApiV1 {
 			//Nothing to do - fail quietly
 		}
 
-		//FIXME - create meta record with exfio version etc., i.e. meta/exfio
+		//create meta/exfio record with exfio client and message version
+		JSONObject metaObject = new JSONObject();
+		metaObject.put("clientVersion", PROTO_CLIENT_VERSION);
+		metaObject.put("messageVersion", PROTO_MESSAGE_VERSION);
+
+		WeaveBasicObject wboMeta = new WeaveBasicObject(KEY_META_ID, null, null, null, metaObject.toJSONString());
+		
+		//Note meta/exfio is NOT encrypted
+		wc.put(KEY_META_COLLECTION, KEY_META_ID, wboMeta, false);
+		
 		//FIXME - create bulk keys for exfioclient and exfiomessage collections
 
 	}
@@ -405,8 +417,6 @@ public class CommsApiV1 {
 		try {
 			WeaveBasicObject wbo = wc.get(KEY_MESSAGE_COLLECTION, keyId, false);
 			EncodedMessage msg = decodeMessageWeavePayload(wbo.getPayloadAsJSONObject());
-			//Assume this is an incoming message
-			msg.setSession(getIncomingMessageSession(msg));
 			return msg;
 		} catch (ParseException e) {
 			throw new WeaveException(e);

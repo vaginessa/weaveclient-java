@@ -12,6 +12,8 @@ public abstract class WeaveClient {
 	
 	public abstract void register(AccountParams params) throws WeaveException;
 
+	public abstract void initServer() throws WeaveException;
+
 	public abstract void init(AccountParams params) throws WeaveException;
 	
 	public StorageVersion getStorageVersion() { return version; }
@@ -24,6 +26,8 @@ public abstract class WeaveClient {
 
 	public abstract String generateWeaveID();
 	
+	public abstract boolean isInitialised() throws WeaveException;
+
 	public abstract boolean isAuthorised();
 
 	public abstract WeaveBasicObject decryptWeaveBasicObject(WeaveBasicObject wbo, String collection) throws WeaveException;
