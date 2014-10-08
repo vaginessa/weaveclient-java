@@ -22,6 +22,7 @@ import org.exfio.weave.ext.clientauth.ClientAuthRequestMessage.ClientAuthVerifie
 import org.exfio.weave.ext.comm.Client;
 import org.exfio.weave.ext.comm.Comms;
 import org.exfio.weave.ext.comm.Message;
+import org.exfio.weave.ext.comm.NoPublishedKeysException;
 import org.exfio.weave.ext.comm.Message.MessageSession;
 import org.exfio.weave.ext.comm.StorageNotFoundException;
 import org.exfio.weave.ext.crypto.PBKDF2;
@@ -161,6 +162,7 @@ public class ClientAuth {
 	 * 
 	 */
 	private ClientAuthVerifier buildClientAuthVerifier(String authCode, String password) {
+		Log.getInstance().debug("buildClientAuthVerifier()");
 		
 		byte[] passwordSaltBin = generatePasswordSalt();
 		String passwordSalt = Base64.encodeBase64String(passwordSaltBin);			
@@ -174,7 +176,9 @@ public class ClientAuth {
 		authVerifier.setInnerSalt(passwordSalt);
 		authVerifier.setSalt(authSalt);
 		authVerifier.setDigest(authDigest);
-		
+
+		Log.getInstance().debug(String.format("digest: %s, salt: %s, innersalt: %s, authcode: %s, password: %s", authVerifier.getDigest(), authVerifier.getSalt(), authVerifier.getInnerSalt(), authCode, password));
+
 		return authVerifier;
 	}
 	
@@ -190,12 +194,15 @@ public class ClientAuth {
 	 *  
 	 */
 	private boolean verifyClientAuthRequestAuthCode(ClientAuthVerifier cav, String authCode, String password) {
+		Log.getInstance().debug("verifyClientAuthRequestAuthCode()");
+		
+		Log.getInstance().debug(String.format("digest: %s, salt: %s, innersalt: %s, authcode: %s, password: %s", cav.getDigest(), cav.getSalt(), cav.getInnerSalt(), authCode, password));
 		
 		byte[] passwordSaltBin = Base64.decodeBase64(cav.getInnerSalt());
 		String passwordHash = generatePasswordHash(password, passwordSaltBin);
 		
 		byte[] authSaltBin = Base64.decodeBase64(cav.getSalt());
-		String authDigest = generateAuthDigest(authCode + passwordHash, authSaltBin);
+		String authDigest = generateAuthDigest(authCode.toUpperCase() + passwordHash, authSaltBin);
 		
 		if ( authDigest.equals(cav.getDigest()) ) {
 			Log.getInstance().info("Client auth verification succeeded");
@@ -267,6 +274,7 @@ public class ClientAuth {
 		//Generate and store auth code
 		authStatus = "pending";
 		authCode   = generateAuthCode();
+		ClientAuthVerifier cav = buildClientAuthVerifier(authCode, password);
 		
 		comms.setProperty(KEY_CLIENT_CONFIG_AUTHSTATUS, authStatus);
 		comms.setProperty(KEY_CLIENT_CONFIG_AUTHCODE, authCode);
@@ -289,22 +297,28 @@ public class ClientAuth {
 			}
 		
 			//Create new session for client
-			MessageSession session = comms.createOutgoingMessageSession(clients[i].getClientId());
+			MessageSession session = null;
+			try {
+				session = comms.createOutgoingMessageSession(clients[i].getClientId());
+			} catch (NoPublishedKeysException e) {
+				Log.getInstance().warn(e.getMessage());
+				continue;
+			}
 			
 	        ClientAuthRequestMessage msg = new ClientAuthRequestMessage(comms.getNewMessage(session));	        
 	        msg.setSequence(1);
 	        
 			//Build client auth request
 			msg.setClientId(comms.getClientId());
-			msg.setClientName(comms.getClientName());			
-			msg.setAuth(buildClientAuthVerifier(authCode, password));
+			msg.setClientName(comms.getClientName());
+			msg.setAuth(cav);
 			
 			@SuppressWarnings("unused")
 			Double modified = comms.sendMessage(msg);
 		}		
 	}
 
-	private void sendClientAuthResponse(String sessionId, boolean authorised, String authCode, String password) throws WeaveException {
+	private void sendClientAuthResponse(String sessionId, boolean authorised, String authCode, String password) throws WeaveException, AuthcodeVerificationFailedException {
 		Log.getInstance().debug("sendClientAuthResponse()");
 				
 		Message[] sessMsgs = null;
@@ -327,7 +341,7 @@ public class ClientAuth {
 		}
 		
 		if (authorised && !verifyClientAuthRequestAuthCode(caRequestMsg.getAuth(), authCode, password) ) {
-			throw new WeaveException(String.format("Auth code verfication failed for client '%s' (%s)", caRequestMsg.getClientName(), caRequestMsg.getClientId()));
+			throw new AuthcodeVerificationFailedException(String.format("Auth code verfication failed for client '%s' (%s)", caRequestMsg.getClientName(), caRequestMsg.getClientId()));
 		}
 
 		ClientAuthResponseMessage caResponseMsg = new ClientAuthResponseMessage(comms.getNewMessage(caRequestMsg.getMessageSessionId()));
@@ -346,6 +360,10 @@ public class ClientAuth {
 		
 		comms.sendMessage(caResponseMsg);
 		
+	}
+
+	public void approveClientAuth(String sessionId, String authCode) throws WeaveException {
+		approveClientAuth(sessionId, authCode, wc.getClientParams().password);
 	}
 
 	public void approveClientAuth(String sessionId, String authCode, String password) throws WeaveException {

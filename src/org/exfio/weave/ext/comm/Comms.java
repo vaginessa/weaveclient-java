@@ -560,11 +560,11 @@ public class Comms {
 		return sess;
 	}
 
-	public MessageSession createOutgoingMessageSession(String otherClientId) throws WeaveException {
+	public MessageSession createOutgoingMessageSession(String otherClientId) throws WeaveException, NoPublishedKeysException {
 		return createOutgoingMessageSession(otherClientId, "requestpending");
 	}
 	
-	public MessageSession createOutgoingMessageSession(String otherClientId, String state) throws WeaveException {
+	public MessageSession createOutgoingMessageSession(String otherClientId, String state) throws WeaveException, NoPublishedKeysException {
 
 		//Generate and store ephemeral ECDH keypair
 		ECDH ecdh = new ECDH();
@@ -598,7 +598,7 @@ public class Comms {
         
 		List<EphemeralKey> ekeys = otherClient.getEphemeralKeys();
 		if ( ekeys.size() == 0 ) {
-			throw new WeaveException(String.format("Can't create message session no published keys found for client '%s'", otherClientId));
+			throw new NoPublishedKeysException(String.format("Can't create message session no published keys found for client '%s'", otherClientId));
 		}
 		
 		int keyIndex = (int)(Math.random() * ekeys.size());

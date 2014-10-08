@@ -332,7 +332,7 @@ public class CommsApiV1 {
 		@SuppressWarnings("unused")
 		WeaveBasicObject wboMeta = null;
 		try {
-			wboMeta = wc.get(KEY_META_COLLECTION, KEY_META_ID);
+			wboMeta = wc.get(KEY_META_COLLECTION, KEY_META_ID, false);
 		} catch (NotFoundException e) {
 			meta = false;
 		}
