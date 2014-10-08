@@ -5,9 +5,11 @@
  * which accompanies this distribution, and is available at
  * http://www.gnu.org/licenses/gpl.html
  * 
+ * Based on DavDroid:
+ *     Richard Hirner (bitfire web engineering)
+ * 
  * Contributors:
  *     Gerry Healy <nickel_chrome@mac.com> - Initial implementation
- *     Richard Hirner (bitfire web engineering) - based on DAVDroid
  ******************************************************************************/
 package org.exfio.weave.net;
 
