@@ -743,8 +743,6 @@ public class Comms {
 		
 		for (String msgId: msgIds) {
 			
-			//FIXME - support messageId GUIDs, i.e. unrelated to ephemeral keys
-
 			Message msg = null;
 			try {
 				msg = commsApi.getMessage(msgId);

@@ -58,9 +58,9 @@ public abstract class WeaveClient {
 		return getCollection(collection, ids, older, newer, index_above, index_below, limit, offset, sort, format, true);
 	}
 
-	public abstract WeaveCollectionInfo getCollectionInfo(String collection, boolean getcount, boolean getusage) throws WeaveException;
+	public abstract WeaveCollectionInfo getCollectionInfo(String collection, boolean getcount, boolean getusage) throws WeaveException, NotFoundException;
 
-	public WeaveCollectionInfo getCollectionInfo(String collection) throws WeaveException { return getCollectionInfo(collection, false, false); }
+	public WeaveCollectionInfo getCollectionInfo(String collection) throws WeaveException, NotFoundException { return getCollectionInfo(collection, false, false); }
 
 	public abstract Double put(String collection, String id, WeaveBasicObject wbo, boolean encrypt) throws WeaveException;
 

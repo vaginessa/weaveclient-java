@@ -488,10 +488,10 @@ public class WeaveClientV5 extends WeaveClient {
 		return colWbo;
 	}
 
-	public WeaveCollectionInfo getCollectionInfo(String collection, boolean getcount, boolean getusage) throws WeaveException {
+	public WeaveCollectionInfo getCollectionInfo(String collection, boolean getcount, boolean getusage) throws WeaveException, NotFoundException {
 		Map<String, WeaveCollectionInfo> wcols = this.storageClient.getInfoCollections(getcount, getusage);
 		if ( !wcols.containsKey(collection) ) {
-			throw new WeaveException(String.format("Collection '%s' not found", collection));
+			throw new NotFoundException(String.format("Collection '%s' not found", collection));
 		}
 		return wcols.get(collection);
 	}

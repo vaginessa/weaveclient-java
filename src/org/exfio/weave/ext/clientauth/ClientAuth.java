@@ -52,7 +52,8 @@ public class ClientAuth {
 	public static final String KEY_CLIENT_CONFIG_AUTHSYNCKEY = "clientauth.synckey";
 	
 	//PBKDF2
-	public static final int PBKDF2_DEFAULT_ITERATIONS = 8000;
+	//Ideally more iterations should be used, i.e. 8000, however as of 2014-10-09 processing time is prohibitive
+	public static final int PBKDF2_DEFAULT_ITERATIONS = 2000;
 	public static final int PBKDF2_DEFAULT_LENGTH     = 128;
 	
 	private WeaveClient wc;

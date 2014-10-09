@@ -508,6 +508,9 @@ public class WeaveClientCLI {
 			} catch(WeaveException e) {
 				System.err.println(e.getMessage());
 				System.exit(1);
+			} catch(NotFoundException e) {
+				System.err.println(e.getMessage());
+				System.exit(1);
 			}
 
 			System.out.println(colinfo.toString());

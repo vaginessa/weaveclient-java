@@ -267,10 +267,6 @@ public class ClientAuthCLI {
 
 			try {
 				ClientAuth auth = new ClientAuth(weaveClient);
-
-				//FIXME - Debug only
-				auth.setPbkdf2Iterations(1000);
-				
 				auth.requestClientAuth(clientName, password, clientDatabase.getPath());
 				authCode = auth.getAuthCode();
 			} catch(WeaveException e) {
@@ -298,9 +294,6 @@ public class ClientAuthCLI {
 			
 			try {			
 				ClientAuth auth = new ClientAuth(weaveClient, clientDatabase.getPath());
-				
-				//FIXME - Debug Only
-				auth.setPbkdf2Iterations(1000);
 				
 				Message[] messages = auth.processClientAuthMessages();
 								
