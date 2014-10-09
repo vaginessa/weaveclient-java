@@ -153,7 +153,9 @@ public class WeaveClientV5 extends WeaveClient {
 		storageClient.put(KEY_CRYPTO_PATH, wboCrypto);
 		
 		//Update account params
-		account.syncKey  = this.syncKey;
+		if ( account != null ) {
+			account.syncKey  = this.syncKey;
+		}
 	}
 
 	
