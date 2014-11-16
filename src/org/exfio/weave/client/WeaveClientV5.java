@@ -51,8 +51,6 @@ public class WeaveClientV5 extends WeaveClient {
 	private WeaveClientV5Params account;
 	private StorageApi storageClient;
 	private AccountApi regClient;
-	private String user;
-	private String syncKey;
 	private WeaveKeyPair privateKey;
 	private Map<String, WeaveKeyPair> bulkKeys;
 
@@ -62,8 +60,6 @@ public class WeaveClientV5 extends WeaveClient {
 		account        = null;
 		storageClient  = null;
 		regClient      = null;
-		user           = null;
-		syncKey        = null;
 		privateKey     = null;
 		bulkKeys       = null;
 	}
@@ -74,9 +70,14 @@ public class WeaveClientV5 extends WeaveClient {
 	}
 
 	public void register(String baseURL, String user, String password, String email) throws WeaveException {
-		this.user            = user;
 		this.privateKey      = null;
 		this.bulkKeys        = null;
+
+		//Store account params
+		account = new WeaveClientV5Params();
+		account.baseURL  = baseURL;
+		account.user     = user;
+		account.password = password;
 
 		//TODO - handle captcha
 		
@@ -89,20 +90,11 @@ public class WeaveClientV5 extends WeaveClient {
 		storageClient.init(regClient.getStorageUrl(), user, password);
 
 		//Generate new synckey and initialise server meta data
-		initServer();
-		
-		//Store account params
-		account = new WeaveClientV5Params();
-		account.baseURL  = baseURL;
-		account.user     = user;
-		account.password = password;
-		account.syncKey  = this.syncKey;
+		initServer();		
 	}
 	
 	@SuppressWarnings("unchecked")
 	public void initServer() throws WeaveException {
-
-		this.syncKey         = null;
 		this.privateKey      = null;
 		this.bulkKeys        = null;
 
@@ -125,12 +117,12 @@ public class WeaveClientV5 extends WeaveClient {
         String syncKeyB32 = b32codec.encodeToString(syncKeyBin);
         
 		// Remove dash chars, convert to uppercase and translate L and O to 8 and 9
-		this.syncKey = syncKeyB32.toUpperCase()
+		account.syncKey = syncKeyB32.toUpperCase()
 								.replace('L', '8')
 								.replace('O', '9')
 								.replaceAll("=", "");
 
-		Log.getInstance().debug( String.format("generated sync key: %s", this.syncKey));
+		Log.getInstance().debug( String.format("generated sync key: %s", account.syncKey));
 
 		//3. Generate default bulk key bundle
 		WeaveKeyPair defaultKeyPair = generateWeaveKeyPair();
@@ -150,12 +142,7 @@ public class WeaveClientV5 extends WeaveClient {
 		//Encrypt payload with private keypair
 		wboCrypto = encryptWeaveBasicObject(wboCrypto, null);
 
-		storageClient.put(KEY_CRYPTO_PATH, wboCrypto);
-		
-		//Update account params
-		if ( account != null ) {
-			account.syncKey  = this.syncKey;
-		}
+		storageClient.put(KEY_CRYPTO_PATH, wboCrypto);		
 	}
 
 	
@@ -165,8 +152,8 @@ public class WeaveClientV5 extends WeaveClient {
 	}
 
 	public void init(String baseURL, String user, String password, String syncKey) throws WeaveException {
-		this.user            = user;
-		this.syncKey         = syncKey;
+		//this.user            = user;
+		//this.syncKey         = syncKey;
 		this.privateKey      = null;
 		this.bulkKeys        = null;
 		
@@ -225,7 +212,7 @@ public class WeaveClientV5 extends WeaveClient {
 	}
 	
 	public boolean isAuthorised() {
-		return ( syncKey != null && syncKey.length() > 0 ); 
+		return ( account.syncKey != null && account.syncKey.length() > 0 ); 
 	}
 	
 	private WeaveKeyPair generateWeaveKeyPair() {
@@ -251,7 +238,7 @@ public class WeaveClientV5 extends WeaveClient {
 			// See https://docs.services.mozilla.com/sync/storageformat5.html#the-sync-key
 
 			// Remove dash chars, convert to uppercase and translate 8 and 9 to L and O
-			String syncKeyB32 = this.syncKey.toUpperCase()
+			String syncKeyB32 = account.syncKey.toUpperCase()
 											.replace('8', 'L')
 											.replace('9', 'O')
 											.replaceAll("-", "");
@@ -267,13 +254,13 @@ public class WeaveClientV5 extends WeaveClient {
 			Base32 b32codec = new Base32();
 			byte[] syncKeyBin = b32codec.decode(syncKeyB32);
 
-			String keyInfo = "Sync-AES_256_CBC-HMAC256" + this.user;
+			String keyInfo = "Sync-AES_256_CBC-HMAC256" + account.user;
 
 			// For testing only
 			//syncKey = binascii.unhexlify("c71aa7cbd8b82a8ff6eda55c39479fd2")
 			//keyInfo = "Sync-AES_256_CBC-HMAC256" + "johndoe@example.com"
 
-			Log.getInstance().debug( String.format("base32 key: %s decoded to %s", this.syncKey, Hex.encodeHexString(syncKeyBin)));
+			Log.getInstance().debug( String.format("base32 key: %s decoded to %s", account.syncKey, Hex.encodeHexString(syncKeyBin)));
 
 			WeaveKeyPair keyPair = new WeaveKeyPair();
 
@@ -289,7 +276,7 @@ public class WeaveClientV5 extends WeaveClient {
 			this.privateKey = keyPair;
 			
 			Log.getInstance().info( "Successfully generated sync key and hmac key");
-			Log.getInstance().debug( String.format("sync key: %s, crypt key: %s, crypt hmac: %s", this.syncKey, Hex.encodeHexString(keyPair.cryptKey), Hex.encodeHexString(keyPair.hmacKey)));
+			Log.getInstance().debug( String.format("sync key: %s, crypt key: %s, crypt hmac: %s", account.syncKey, Hex.encodeHexString(keyPair.cryptKey), Hex.encodeHexString(keyPair.hmacKey)));
 		}
 		return this.privateKey;
 	}

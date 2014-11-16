@@ -243,14 +243,14 @@ public class ClientAuth {
 	public void initClientAuth(String clientName, String database) throws WeaveException {
 		Log.getInstance().debug("initClientAuth()");
 
-		if ( !isAuthorised() ) {
+		if ( comms.isInitialised() && !isAuthorised() ) {
 			throw new WeaveException("Must be an authorised client to reset client auth collections");
 		}
 		
 		//FIXME - Rotate sync key and revoke auth status for other clients (preserve clientId?)
 		//For now clean clientauth collections and recreate client from scratch
 		
-		comms.initServer();		
+		comms.initServer();
 		comms.initClient(clientName, true, database);
 		
 		//Set clientauth properties
