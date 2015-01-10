@@ -1,5 +1,7 @@
 package org.exfio.weave.util;
 
+import org.apache.commons.codec.DecoderException;
+
 public final class Hex {
 	
     /**
@@ -13,4 +15,13 @@ public final class Hex {
 	public static String encodeHexString(byte[] data) {
         return new String(org.apache.commons.codec.binary.Hex.encodeHex(data));
 	}
+	
+	public static byte[] decodeHexString(String encoded) {
+		try {
+			return org.apache.commons.codec.binary.Hex.decodeHex(encoded.toCharArray());
+		} catch (DecoderException e) {
+			throw new AssertionError(e);
+		}
+	}
+
 }

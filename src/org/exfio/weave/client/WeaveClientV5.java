@@ -90,7 +90,7 @@ public class WeaveClientV5 extends WeaveClient {
 		storageClient.init(regClient.getStorageUrl(), user, password);
 
 		//Generate new synckey and initialise server meta data
-		initServer();		
+		initServer();
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -251,14 +251,16 @@ public class WeaveClientV5 extends WeaveClient {
 				syncKeyB32 = StringUtils.rightPad(syncKeyB32, paddedLength, '=');
 			}
 
+			Log.getInstance().debug( String.format("padded sync key: %s",  syncKeyB32));
+
 			Base32 b32codec = new Base32();
 			byte[] syncKeyBin = b32codec.decode(syncKeyB32);
 
 			String keyInfo = "Sync-AES_256_CBC-HMAC256" + account.user;
 
 			// For testing only
-			//syncKey = binascii.unhexlify("c71aa7cbd8b82a8ff6eda55c39479fd2")
-			//keyInfo = "Sync-AES_256_CBC-HMAC256" + "johndoe@example.com"
+			//syncKeyBin = Hex.decodeHexString("c71aa7cbd8b82a8ff6eda55c39479fd2");
+			//keyInfo = "Sync-AES_256_CBC-HMAC256" + "johndoe@example.com";
 
 			Log.getInstance().debug( String.format("base32 key: %s decoded to %s", account.syncKey, Hex.encodeHexString(syncKeyBin)));
 
