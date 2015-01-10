@@ -1,7 +1,11 @@
 #!/bin/bash
 
+#JAVA_HOME="/System/Library/Java/JavaVirtualMachines/1.6.0.jdk/Contents/Home"
+#JAVA_BIN="${JAVA_HOME}/bin/java"
+JAVA_BIN=java
+
 WEAVE_BINPATH=$(dirname $0)
 WEAVE_CLASSPATH="${WEAVE_BINPATH}/bin:${WEAVE_BINPATH}/libs/*:${WEAVE_BINPATH}/runtime-libs/*" 
 
-#echo "java -cp $WEAVE_CLASSPATH org.exfio.weave.client.WeaveClientCLI $@"
-java -cp $WEAVE_CLASSPATH org.exfio.weave.client.WeaveClientCLI "$@"
+#echo "${JAVA_BIN} -cp $WEAVE_CLASSPATH org.exfio.weave.client.WeaveClientCLI $@"
+"${JAVA_BIN}" -cp $WEAVE_CLASSPATH org.exfio.weave.client.WeaveClientCLI "$@"
