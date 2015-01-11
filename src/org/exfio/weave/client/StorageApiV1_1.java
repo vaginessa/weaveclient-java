@@ -25,6 +25,7 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPut;
 import org.apache.http.client.protocol.HttpClientContext;
 import org.apache.http.client.utils.URLEncodedUtils;
+import org.apache.http.client.utils.URIBuilder;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.auth.BasicScheme;
 import org.apache.http.impl.client.BasicAuthCache;
@@ -277,15 +278,12 @@ public class StorageApiV1_1 extends StorageApi {
 		}
 
 		try {
-			location = new URI(
-					location.getScheme(),
-					location.getUserInfo(),
-					location.getHost(),
-					location.getPort(),
-					location.getPath(),
-					URLEncodedUtils.format(params, "UTF-8"),
-					location.getFragment()
-			);
+			//FIXME - use URI builder for all uri handling
+			
+			//Use URIBuilder to encode query string parameters. java.util.URI DOES NOT correctly handle commas
+			URIBuilder uri = new URIBuilder(location);
+			uri.setParameters(params);
+			location = new URI(uri.toString());
 		} catch (URISyntaxException e) {
 			throw new WeaveException(e);
 		}
