@@ -13,38 +13,37 @@ package org.exfio.weave.client;
 import java.io.IOException;
 
 import org.exfio.weave.WeaveException;
+import org.exfio.weave.account.WeaveAccountParams;
 import org.exfio.weave.client.WeaveClientFactory.StorageVersion;
 import org.exfio.weave.client.WeaveClientFactory.ApiVersion;
+import org.exfio.weave.storage.NotFoundException;
+import org.exfio.weave.storage.StorageContext;
+import org.exfio.weave.storage.WeaveBasicObject;
+import org.exfio.weave.storage.WeaveCollectionInfo;
 
 public abstract class WeaveClient {
 	
 	protected StorageVersion version = null;
 	
-	public abstract void register(AccountParams params) throws WeaveException;
+	public abstract void init(WeaveAccountParams params) throws WeaveException;
+
+	public abstract void registerClient(WeaveClientRegistrationParams params) throws WeaveException;
 
 	public abstract void initServer() throws WeaveException;
 
-	public abstract void init(AccountParams params) throws WeaveException;
-	
 	public StorageVersion getStorageVersion() { return version; }
 
 	public ApiVersion getApiVersion() { return getApiClient().getApiVersion(); }
 
-	public abstract StorageApi getApiClient();
+	public abstract StorageContext getApiClient();
 	
-	public abstract AccountParams getClientParams();
+	public abstract WeaveAccountParams getClientParams();
 
-	public abstract String generateWeaveID();
-	
 	public abstract boolean isInitialised() throws WeaveException;
 
 	public abstract boolean isAuthorised();
 
-	public abstract WeaveBasicObject decryptWeaveBasicObject(WeaveBasicObject wbo, String collection) throws WeaveException;
-
-	public abstract String decrypt(String payload, String collection) throws WeaveException;
-	
-	public abstract String encrypt(String plaintext, String collection) throws WeaveException;
+	public abstract String generateWeaveID();
 	
 	public abstract WeaveBasicObject get(String collection, String id, boolean decrypt) throws WeaveException, NotFoundException;
 	

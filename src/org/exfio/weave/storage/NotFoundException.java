@@ -8,15 +8,15 @@
  * Contributors:
  *     Richard Hirner (bitfire web engineering) - initial API and implementation
  ******************************************************************************/
-package org.exfio.weave;
+package org.exfio.weave.storage;
 
-import java.nio.charset.Charset;
+import org.apache.http.HttpStatus;
+import org.exfio.weave.net.HttpException;
 
-public class Constants {
-	public static final String APP_VERSION = "0.1";
-	public static final String APP_PACKAGE = "org.exfio.weave";
-	public static final String APP_NAME    = "weaveclient-java";
+public class NotFoundException extends HttpException {
+	private static final long serialVersionUID = 1565961502781880483L;
 	
-	public static final Charset ASCII = Charset.forName("US-ASCII");
-	public static final Charset UTF8 = Charset.forName("UTF-8");
+	public NotFoundException(String reason) {
+		super(HttpStatus.SC_NOT_FOUND, reason);
+	}
 }

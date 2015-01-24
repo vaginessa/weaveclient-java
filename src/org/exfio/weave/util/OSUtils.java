@@ -11,6 +11,7 @@ public class OSUtils {
 	private static String os      = "unknown";
 	private static String distro  = "unknown";
 	private static String version = "unknown";
+	private static String type    = "unknown"; //desktop or mobile
  
 	static {
 		init();
@@ -23,23 +24,30 @@ public class OSUtils {
 		
 		if ( osName.indexOf("win") >= 0 ) {
 			os = "windows";
+			type = "desktop";
 		} else if ( osName.indexOf("mac") >= 0 ) {
 			os = "mac";
 			
 			if ( osName.indexOf("os x") >= 0 || osName.indexOf("osx") >= 0 ) {
 				distro = "osx";
 			}
+			type = "desktop";
 		} else if ( osName.indexOf("linux") >= 0 ) {
 			os = "linux";
 			
 			if ( runtime.indexOf("android") >= 0 || vm.indexOf("davlik") >= 0 ) {
 				distro = "android";
+				type = "mobile";
+			} else {
+				type = "desktop";
 			}
 		} else if ( osName.indexOf("nix") >= 0 || osName.indexOf("aix") >= 0 ) {
 			os = "unix";
+			type = "desktop";
 		} else if ( osName.indexOf("sunos") >= 0 ) {
 			os = "unix";
 			distro = "solaris";
+			type = "desktop";
 		}		
 	}
 	
@@ -119,6 +127,10 @@ public class OSUtils {
 		return version;
 	}
 
+	public static String getType() {
+		return type;
+	}
+	
 	public static boolean isWindows() { 
 		return ( os.equals("windows") );
 	}
@@ -141,5 +153,13 @@ public class OSUtils {
 
 	public static boolean isAndroid() {
 		return ( os.equals("linux") && distro.equals("android") );
+	}
+	
+	public static boolean isDesktop() {
+		return getType().equals("desktop");
+	}
+
+	public static boolean isMobile() {
+		return getType().equals("mobile");
 	}
 }

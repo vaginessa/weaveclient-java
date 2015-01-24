@@ -26,58 +26,62 @@ import org.exfio.weave.util.Log;
 public class PayloadCipher {
 	
 	public String decrypt(String payload, WeaveKeyPair keyPair) throws WeaveException {
+		
+		if (keyPair == null) {
+			throw new AssertionError("keyPair is a required parameter");
+		}
+		
 		String cleartext         = null;
 		JSONObject encryptObject = null;
-		
-        // Parse JSONUtils encoded payload
+
+		// Parse JSONUtils encoded payload
 		try {
 			JSONParser parser = new JSONParser();			
 			encryptObject = (JSONObject)parser.parse(payload);  
 		} catch (ParseException e) {
 			throw new WeaveException(e);
 		}
-        
-        // An encrypted payload has three relevant fields
-        String ciphertext  = (String)encryptObject.get("ciphertext");
-        byte[] cipherbytes = Base64.decodeBase64(ciphertext);
-        byte[] iv          = Base64.decodeBase64((String)encryptObject.get("IV"));
-        String cipher_hmac = (String)encryptObject.get("hmac");
-                    
-        Log.getInstance().debug( String.format("payload: %s, crypt key:  %s, crypt hmac: %s", payload, Hex.encodeHexString(keyPair.cryptKey), Hex.encodeHexString(keyPair.hmacKey)));
-            
-            
-        // 1. Validate hmac of ciphertext
-        // Note: HMAC verification is done against base64 encoded ciphertext
-        String local_hmac = null;
-        
-        try {
-            Mac hmacSHA256 = Mac.getInstance("HmacSHA256");
-            hmacSHA256.init(new SecretKeySpec(keyPair.hmacKey, "HmacSHA256"));
-            local_hmac = Hex.encodeHexString(hmacSHA256.doFinal(ciphertext.getBytes(Constants.ASCII)));
+
+		// An encrypted payload has three relevant fields
+		String ciphertext  = (String)encryptObject.get("ciphertext");
+		byte[] cipherbytes = Base64.decodeBase64(ciphertext);
+		byte[] iv          = Base64.decodeBase64((String)encryptObject.get("IV"));
+		String cipher_hmac = (String)encryptObject.get("hmac");
+
+		Log.getInstance().debug( String.format("payload: %s, crypt key:  %s, crypt hmac: %s", payload, Hex.encodeHexString(keyPair.cryptKey), Hex.encodeHexString(keyPair.hmacKey)));
+
+		// 1. Validate hmac of ciphertext
+		// Note: HMAC verification is done against base64 encoded ciphertext
+		String local_hmac = null;
+
+		try {
+			Mac hmacSHA256 = Mac.getInstance("HmacSHA256");
+			hmacSHA256.init(new SecretKeySpec(keyPair.hmacKey, "HmacSHA256"));
+			local_hmac = Hex.encodeHexString(hmacSHA256.doFinal(ciphertext.getBytes(Constants.ASCII)));
 		} catch (NoSuchAlgorithmException e) {
 			throw new WeaveException(e);
 		} catch (InvalidKeyException e) {
 			throw new WeaveException(e);
 		}
-        
-        if ( !local_hmac.equals(cipher_hmac) ) {
-        	Log.getInstance().warn(String.format("cipher hmac: %s, local hmac: %s", cipher_hmac, local_hmac));
-        	throw new WeaveException("HMAC verification failed!");
-        }
-            
-        // 2. Decrypt ciphertext
-        // Note: this is the same as this operation at the openssl command line:
-        // openssl enc -d -in data -aes-256-cbc -K `cat unwrapped_symkey.16` -iv `cat iv.16`
-        try {
-        	Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-        	cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(keyPair.cryptKey, "AES"), new IvParameterSpec(iv));
-        	
-        	byte[] clearbytes = cipher.doFinal(cipherbytes);
-        	cleartext = new String(clearbytes, Constants.UTF8);
-        	
-            Log.getInstance().debug(String.format("cleartext: %s", cleartext));
 
-        } catch (NoSuchAlgorithmException e) {
+		if ( !local_hmac.equals(cipher_hmac) ) {
+			Log.getInstance().warn(String.format("cipher hmac: %s, local hmac: %s", cipher_hmac, local_hmac));
+			throw new WeaveException("HMAC verification failed!");
+		}
+
+		// 2. Decrypt ciphertext
+		// Note: this is the same as this operation at the openssl command line:
+		// openssl enc -d -in data -aes-256-cbc -K `cat unwrapped_symkey.16` -iv `cat iv.16`
+		try {
+			Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+			cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(keyPair.cryptKey, "AES"), new IvParameterSpec(iv));
+
+			byte[] clearbytes = cipher.doFinal(cipherbytes);
+			cleartext = new String(clearbytes, Constants.UTF8);
+
+			Log.getInstance().debug(String.format("cleartext: %s", cleartext));
+
+		} catch (NoSuchAlgorithmException e) {
 			throw new WeaveException(e);
 		} catch (InvalidAlgorithmParameterException e) {
 			throw new WeaveException(e);
@@ -89,10 +93,10 @@ public class PayloadCipher {
 			throw new WeaveException(e);
 		} catch (InvalidKeyException e) {
 			throw new WeaveException(e);
-        }
+		}
 
-        Log.getInstance().info("Successfully decrypted v5 data record");
-        
+		Log.getInstance().info("Successfully decrypted v5 data record");
+
 		return cleartext;
 	}
 

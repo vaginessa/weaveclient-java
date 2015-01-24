@@ -4,31 +4,64 @@ package org.exfio.weave.client;
 import lombok.Getter;
 import lombok.Setter;
 
-import org.json.simple.JSONObject;
 import org.exfio.weave.InvalidStorageException;
 import org.exfio.weave.WeaveException;
+
+import org.exfio.weave.account.WeaveAccountParams;
 import org.exfio.weave.client.WeaveClient;
-import org.exfio.weave.client.WeaveClientV5;
+import org.exfio.weave.client.WeaveClientV1_1;
+
 
 public class WeaveClientFactory {
 	
-	public static enum StorageVersion {
-		v5;
-	}
-
 	public static enum ApiVersion {
-		v1_1;
+		v1_1,
+		v1_5;
+	}
+	
+	public static enum StorageVersion {
+		v5,
+		v6;
 	}
 
+	@Getter @Setter
+	private static ApiVersion defaultApiVersion = ApiVersion.v1_1;
 	
 	@Getter @Setter
 	private static StorageVersion defaultStorageVersion = StorageVersion.v5;
 	
+	public static String apiVersionToString(ApiVersion version) {
+		String versionString = null;
+		switch (version) {
+		case v1_1:
+			versionString = "1.1";
+			break;
+		case v1_5:
+			versionString = "1.5";
+			break;
+		default:
+		}
+		return versionString;
+	}
+
+	public static ApiVersion stringToApiVersion(String version) {
+		ApiVersion apiVersion = null;
+		if ( version.equals("1.1") ) {
+			apiVersion = ApiVersion.v1_1;
+		} else if ( version.equals("1.5") ) {
+			apiVersion = ApiVersion.v1_5;
+		}
+		return apiVersion;
+	}
+
 	public static String storageVersionToString(StorageVersion version) {
 		String versionString = null;
 		switch (version) {
 		case v5:
 			versionString = "5";
+			break;
+		case v6:
+			versionString = "6";
 			break;
 		default:
 		}
@@ -39,83 +72,40 @@ public class WeaveClientFactory {
 		StorageVersion storageVersion = null;
 		if ( version.equals("5") ) {
 			storageVersion = StorageVersion.v5;
+		} else if ( version.equals("6") ) {
+			storageVersion = StorageVersion.v6;
 		}
 		return storageVersion;
 	}
 
-	public static final StorageVersion autoDiscoverStorageVersion(AccountParams adParams) throws WeaveException, InvalidStorageException {
-		StorageVersion storageVersion = null;
-		
-		//Initialise registration and storage clients with account details
-		AccountApi regClient = new RegistrationApiV1_0();
-		regClient.init(adParams.baseURL, adParams.user, adParams.password);
-		StorageApi storageClient = new StorageApiV1_1();
-		storageClient.init(regClient.getStorageUrl(), adParams.user, adParams.password);
-		
-		WeaveBasicObject wbo = null;
-		try {
-			wbo = storageClient.get(WeaveClientV5.KEY_META_PATH);
-		} catch (NotFoundException e) {
-			//Storage may be an uninitialised
-			throw new InvalidStorageException(String.format("%s not found - %s", WeaveClientV5.KEY_META_PATH, e.getMessage()));
-		}
-		JSONObject jsonPayload = null;
-		
-		try {
-			jsonPayload = wbo.getPayloadAsJSONObject();
-		} catch (org.json.simple.parser.ParseException e) {
-			throw new WeaveException(e);
-		}
-		
-		if ( !jsonPayload.containsKey("storageVersion") ) {
-			throw new WeaveException(String.format("Storage version not found in %s record", WeaveClientV5.KEY_META_PATH));
-		}
-
-		Long version = null;
-		if (jsonPayload.get("storageVersion").getClass().equals(Long.class)) {
-			version = (Long)jsonPayload.get("storageVersion");
-		} else {
-			version = Long.parseLong((String)jsonPayload.get("storageVersion"));
-		}
-		
-		if ( version == 5 ) {
-			storageVersion = StorageVersion.v5;
-		} else {
-			throw new WeaveException(String.format("Storage version '%s' not supported", version));
-		}
-		
-		return storageVersion;
-	}
-
-	public static final WeaveClient getInstance(AccountParams params) throws WeaveException, InvalidStorageException {
+	public static final WeaveClient getInstance(WeaveAccountParams params) throws WeaveException, InvalidStorageException {
 		//return WeaveClient for given parameters
 		WeaveClient weaveClient = null;
-		
-		if ( params.getStorageVersion() == null ) {
+
+		if ( params.getApiVersion() == null ) {
 			//auto-discovery
-			StorageVersion storageVersion = autoDiscoverStorageVersion(params);
-			weaveClient = getInstance(storageVersion);
+			throw new WeaveException("auto discover not implemented");
 		} else {
-			weaveClient = getInstance(params.getStorageVersion());
+			weaveClient = getInstance(params.getApiVersion());
 			weaveClient.init(params);
 		}
 		
 		return weaveClient;
 	}
 
-	public static final WeaveClient getInstance(StorageVersion storageVersion) throws WeaveException {
+	public static final WeaveClient getInstance(ApiVersion apiVersion) throws WeaveException {
 		//return WeaveClient for given storage context
 		
 		//TODO - Use reflection to detect and load additional storage versions
 		
 		WeaveClient wc = null;
 		
-		switch(storageVersion) {
-		case v5:
-			wc = new WeaveClientV5();
+		switch(apiVersion) {
+		case v1_1:
+			wc = new WeaveClientV1_1();
 			break;
 		default:
-			throw new WeaveException(String.format("Weave storage version '%s' not recognised", storageVersion));
+			throw new WeaveException(String.format("Weave Sync API version '%s' not recognised", apiVersion));
 		}
 		
 		return wc;

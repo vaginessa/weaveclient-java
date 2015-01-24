@@ -27,10 +27,10 @@ import org.apache.http.conn.ConnectionKeepAliveStrategy;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.exfio.weave.Constants;
-import org.exfio.weave.client.NotFoundException;
 import org.exfio.weave.client.PreconditionFailedException;
 import org.exfio.weave.net.HttpException;
 import org.exfio.weave.net.HttpRequestRetryHandler;
+import org.exfio.weave.storage.NotFoundException;
 import org.exfio.weave.util.Log;
 
 
@@ -47,7 +47,7 @@ public class HttpClient {
 	private static CloseableHttpClient httpClient = null;
 	private static ReentrantReadWriteLock httpClientLock = null;
 
-	private static String userAgent = "eXfio Weave/" + Constants.VERSION;
+	private static String userAgent = "eXfio Weave/" + Constants.APP_VERSION;
 
 	//---------------------------------
 	// Static (initialisation) methods
