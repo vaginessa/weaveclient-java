@@ -5,6 +5,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.security.GeneralSecurityException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
@@ -29,7 +30,7 @@ import org.exfio.weave.account.WeaveAccount;
 import org.exfio.weave.account.WeaveAccountParams;
 import org.exfio.weave.client.WeaveClientFactory;
 import org.exfio.weave.client.WeaveClientFactory.ApiVersion;
-import org.exfio.weave.crypto.WeaveCryptoV5;
+import org.exfio.weave.crypto.WeaveSyncV5Crypto;
 import org.exfio.weave.crypto.WeaveKeyPair;
 import org.exfio.weave.net.HttpException;
 import org.exfio.weave.net.HttpClient;
@@ -43,7 +44,7 @@ import org.exfio.weave.util.Log;
 import org.exfio.weave.util.URIUtils;
 
 //FIXME - Add support for account management
-public class FirefoxSyncLegacy extends WeaveAccount {
+public class WeaveSyncV5Account extends WeaveAccount {
 	
 	public static final String KEY_ACCOUNT_CONFIG_SYNCKEY      = "synckey";
 
@@ -53,7 +54,7 @@ public class FirefoxSyncLegacy extends WeaveAccount {
 	private String syncKey;
 	private WeaveKeyPair keyPair;
 	
-	public FirefoxSyncLegacy() {
+	public WeaveSyncV5Account() {
 		super();
 		this.version  = ApiVersion.v1_1;
 		this.baseURL  = null;
@@ -62,8 +63,9 @@ public class FirefoxSyncLegacy extends WeaveAccount {
 		this.syncKey  = null;
 	}
 
+	@Override
 	public void init(WeaveAccountParams params) throws WeaveException {
-		FirefoxSyncLegacyParams initParams = (FirefoxSyncLegacyParams)params;
+		WeaveSyncV5AccountParams initParams = (WeaveSyncV5AccountParams)params;
 		this.init(initParams.accountServer, initParams.user, initParams.password, initParams.syncKey);		
 	}
 	
@@ -81,7 +83,7 @@ public class FirefoxSyncLegacy extends WeaveAccount {
 
 	@Override
 	public void createAccount(WeaveAccountParams params) throws WeaveException {
-		FirefoxSyncLegacyParams regParams = (FirefoxSyncLegacyParams)params;
+		WeaveSyncV5AccountParams regParams = (WeaveSyncV5AccountParams)params;
 		this.createAccount(regParams.accountServer, regParams.user, regParams.password, regParams.email);
 	}
 
@@ -125,6 +127,8 @@ public class FirefoxSyncLegacy extends WeaveAccount {
 			throw new WeaveException(e);
 		} catch (HttpException e) {
 			throw new WeaveException(e);
+		} catch (GeneralSecurityException e) {
+			throw new WeaveException(e);
 		} finally {
 			HttpClient.closeResponse(response);
 		} 
@@ -151,7 +155,7 @@ public class FirefoxSyncLegacy extends WeaveAccount {
 		storageClient.init(this);
 
 		//Initialise server meta data
-		WeaveCryptoV5 cryptoClient = new WeaveCryptoV5();
+		WeaveSyncV5Crypto cryptoClient = new WeaveSyncV5Crypto();
 		cryptoClient.init(storageClient, this.getMasterKeyPair());
 		cryptoClient.initServer();
 	}
@@ -164,7 +168,7 @@ public class FirefoxSyncLegacy extends WeaveAccount {
 			storageClient.init(this);
 	
 			//Initialise server meta data
-			WeaveCryptoV5 cryptoClient = new WeaveCryptoV5();
+			WeaveSyncV5Crypto cryptoClient = new WeaveSyncV5Crypto();
 			cryptoClient.init(storageClient, this.getMasterKeyPair());
 			if ( cryptoClient.isInitialised() ) {
 				String status = "";
@@ -187,7 +191,7 @@ public class FirefoxSyncLegacy extends WeaveAccount {
 	}
 	
 	public WeaveAccountParams getAccountParams() {
-		FirefoxSyncLegacyParams params = new FirefoxSyncLegacyParams();
+		WeaveSyncV5AccountParams params = new WeaveSyncV5AccountParams();
 		params.accountServer  = this.baseURL.toString();
 		params.user           = this.user;
 		params.password       = this.password;
@@ -201,17 +205,6 @@ public class FirefoxSyncLegacy extends WeaveAccount {
 		params.user           = this.user;
 		params.password       = this.password;
 		return params;
-	}
-
-	public void writeConfig(File configFile) throws IOException {
-		Properties clientProp = new Properties();
-		
-		clientProp.setProperty(KEY_ACCOUNT_CONFIG_SERVER, this.baseURL.toString());
-		clientProp.setProperty(KEY_ACCOUNT_CONFIG_USERNAME, this.user);
-		clientProp.setProperty(KEY_ACCOUNT_CONFIG_SYNCKEY, this.syncKey);
-		
-		configFile.getParentFile().mkdirs();
-		clientProp.store(new FileOutputStream(configFile), "");
 	}
 
 	public URI getStorageUrl() throws WeaveException {
@@ -235,6 +228,8 @@ public class FirefoxSyncLegacy extends WeaveAccount {
 		} catch (HttpException e) {
 			throw new WeaveException(e);
 		} catch (URISyntaxException e) {
+			throw new WeaveException(e);
+		} catch (GeneralSecurityException e) {
 			throw new WeaveException(e);
 		} finally {
 			HttpClient.closeResponse(response);
@@ -303,7 +298,7 @@ public class FirefoxSyncLegacy extends WeaveAccount {
 	}
 	
 	public Properties accountParamsToProperties(WeaveAccountParams params) {
-		FirefoxSyncLegacyParams fslParams = (FirefoxSyncLegacyParams)params;
+		WeaveSyncV5AccountParams fslParams = (WeaveSyncV5AccountParams)params;
 		
 		Properties prop = new Properties();
 		prop.setProperty(KEY_ACCOUNT_CONFIG_APIVERSION, WeaveClientFactory.apiVersionToString(fslParams.getApiVersion()));
@@ -315,7 +310,7 @@ public class FirefoxSyncLegacy extends WeaveAccount {
 	}
 
 	public WeaveAccountParams propertiesToAccountParams(Properties prop) {
-		FirefoxSyncLegacyParams fslParams = new FirefoxSyncLegacyParams();
+		WeaveSyncV5AccountParams fslParams = new WeaveSyncV5AccountParams();
 		
 		fslParams.accountServer = prop.getProperty(KEY_ACCOUNT_CONFIG_SERVER);
 		fslParams.user          = prop.getProperty(KEY_ACCOUNT_CONFIG_USERNAME);

@@ -301,7 +301,9 @@ public class Comms {
 			}
 		}
 		
-		if ( wc.isAuthorised() ) {
+		//FIXME - refactor ExfioPeerV1 as WeaveAccount
+		//if ( wc.isAuthorised() ) {
+		if ( false ) {
 			//If client is authorised ensure CLIENT_EPHEMERAL_KEYS_NUM ephemeral keys are published			
 			
 			ECDH ecdh = new ECDH();

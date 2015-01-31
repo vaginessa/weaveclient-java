@@ -10,31 +10,28 @@
  ******************************************************************************/
 package org.exfio.weave.client;
 
-import java.util.Map;
-
 import org.json.simple.JSONObject;
 import org.json.simple.parser.ParseException;
+
 import org.exfio.weave.Constants;
 import org.exfio.weave.WeaveException;
 import org.exfio.weave.account.WeaveAccount;
 import org.exfio.weave.account.WeaveAccountParams;
-import org.exfio.weave.account.legacy.WeaveSyncV5Account;
-import org.exfio.weave.account.legacy.WeaveSyncV5AccountParams;
+import org.exfio.weave.account.fxa.FxAccount;
+import org.exfio.weave.account.fxa.FxAccountParams;
 import org.exfio.weave.client.WeaveClientFactory.StorageVersion;
 import org.exfio.weave.crypto.WeaveSyncV5Crypto;
 import org.exfio.weave.storage.NotFoundException;
-import org.exfio.weave.storage.StorageContext;
-import org.exfio.weave.storage.StorageV1_1;
+import org.exfio.weave.storage.StorageV1_5;
 import org.exfio.weave.storage.WeaveBasicObject;
-import org.exfio.weave.storage.WeaveCollectionInfo;
 import org.exfio.weave.util.Log;
 import org.exfio.weave.util.OSUtils;
 
-public class WeaveClientV1_1 extends WeaveClient {
+public class WeaveClientV1_5 extends WeaveClient {
 		
 	private WeaveAccount accountClient;
 	
-	public WeaveClientV1_1() {
+	public WeaveClientV1_5() {
 		super();
 		version        = StorageVersion.v5;
 		account        = null;
@@ -42,27 +39,28 @@ public class WeaveClientV1_1 extends WeaveClient {
 		accountClient      = null;
 	}
 
-	public void init(String baseURL, String user, String password, String syncKey) throws WeaveException {
+	public void init(String accountServer, String tokenServer, String user, String password) throws WeaveException {
 		
-		//Store account params
-		WeaveSyncV5AccountParams initParams = new WeaveSyncV5AccountParams();
-		initParams.accountServer  = baseURL;
+		FxAccountParams initParams = new FxAccountParams();
+		initParams.accountServer  = accountServer;
+		initParams.tokenServer    = tokenServer;
 		initParams.user           = user;
 		initParams.password       = password;
-		initParams.syncKey        = syncKey;
 		
 		init(initParams);
 	}
 
 	@Override
 	public void init(WeaveAccountParams params) throws WeaveException {
-		account = (WeaveSyncV5AccountParams)params;
+		account = (FxAccountParams)params;
 
 		//Initialise account, storage and crypto clients
-		accountClient = new WeaveSyncV5Account();
+		accountClient = new FxAccount();
 		accountClient.init(account);
-		storageClient = new StorageV1_1();
+		storageClient = new StorageV1_5();
 		storageClient.init(accountClient);
+		
+		//FIXME - check storageVersion
 		cryptoClient = new WeaveSyncV5Crypto();
 		cryptoClient.init(storageClient, accountClient.getMasterKeyPair());
 		
@@ -91,6 +89,8 @@ public class WeaveClientV1_1 extends WeaveClient {
 	@SuppressWarnings("unchecked")
 	private void updateClientRecord(WeaveClientRegistrationParams regParams, boolean checkCollision) throws WeaveException {
 	
+		//FIXME - update for v1.5 storage API
+		
 		if (
 			( regParams.clientId == null || regParams.clientId.isEmpty() )
 			||	
@@ -160,7 +160,6 @@ public class WeaveClientV1_1 extends WeaveClient {
 	}
 
 	public boolean isAuthorised() {
-		WeaveSyncV5AccountParams wsParams = (WeaveSyncV5AccountParams)account;
-		return ( wsParams.syncKey != null && !wsParams.syncKey.isEmpty() ); 
+		throw new AssertionError("Not yet implemented");
 	}
 }

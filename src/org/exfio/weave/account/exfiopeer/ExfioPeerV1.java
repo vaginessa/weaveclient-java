@@ -32,7 +32,7 @@ import org.exfio.weave.account.exfiopeer.comm.NoPublishedKeysException;
 import org.exfio.weave.account.exfiopeer.comm.StorageNotFoundException;
 import org.exfio.weave.account.exfiopeer.comm.Message.MessageSession;
 import org.exfio.weave.account.exfiopeer.crypto.PBKDF2;
-import org.exfio.weave.account.legacy.FirefoxSyncLegacyParams;
+import org.exfio.weave.account.legacy.WeaveSyncV5AccountParams;
 import org.exfio.weave.client.WeaveClient;
 import org.exfio.weave.client.WeaveClientFactory;
 import org.exfio.weave.client.WeaveClientFactory.StorageVersion;
@@ -110,7 +110,7 @@ public class ExfioPeerV1 {
 	private String getWeavePassword() throws WeaveException {
 		String password = null;
 		if ( wc.getStorageVersion() == WeaveClientFactory.StorageVersion.v5 ) {
-			FirefoxSyncLegacyParams params = (FirefoxSyncLegacyParams)wc.getClientParams();
+			WeaveSyncV5AccountParams params = (WeaveSyncV5AccountParams)wc.getClientParams();
 			password = params.password;
 		} else {
 			throw new WeaveException(String.format("Storage version '%s' not supported", WeaveClientFactory.storageVersionToString(wc.getStorageVersion())));
@@ -226,14 +226,16 @@ public class ExfioPeerV1 {
 
 	private String getAuthorisedSyncKey() {
 		if ( wc.getStorageVersion() == StorageVersion.v5 ) {
-			return ((FirefoxSyncLegacyParams)wc.getClientParams()).syncKey;
+			return ((WeaveSyncV5AccountParams)wc.getClientParams()).syncKey;
 		} else {
 			return null;
 		}
 	}
 
 	private boolean isAuthorised() {
-		return wc.isAuthorised();
+		//FIXME - refactor ExfioPeerV1 as WeaveAccount
+		//return wc.isAuthorised();
+		return false;
 	}
 
 	public boolean isInitialised() throws WeaveException {

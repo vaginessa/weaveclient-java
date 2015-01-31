@@ -39,6 +39,7 @@ public class Log {
 	}
 
 	public static void setLogLevel(String level) {
+		System.setProperty("org.apache.commons.logging.simplelog.defaultlog", level);
 		setLogLevel(logtag, level);
 	}
 	
@@ -49,5 +50,17 @@ public class Log {
 		}
 		System.setProperty("org.apache.commons.logging.simplelog.log." + logger, level);
 	}
-
+	
+	public static void trace(String tag, String message) { getInstance(tag).trace(message); }
+	public static void debug(String tag, String message) { getInstance(tag).debug(message); }
+	public static void info(String tag, String message)  { getInstance(tag).info(message); }
+	public static void warn(String tag, String message)  { getInstance(tag).warn(message); }
+	public static void error(String tag, String message) { getInstance(tag).error(message); }
+	public static void fatal(String tag, String message) { getInstance(tag).fatal(message); }
+	public static void t(String tag, String message)     { getInstance(tag).trace(message); }
+	public static void d(String tag, String message)     { getInstance(tag).debug(message); }
+	public static void i(String tag, String message)     { getInstance(tag).info(message); }
+	public static void w(String tag, String message)     { getInstance(tag).warn(message); }
+	public static void e(String tag, String message)     { getInstance(tag).error(message); }
+	public static void wtf(String tag, String message)   { getInstance(tag).fatal(message); }	
 }

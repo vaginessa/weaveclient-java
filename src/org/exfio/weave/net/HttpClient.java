@@ -13,6 +13,7 @@
  ******************************************************************************/
 package org.exfio.weave.net;
 
+import java.security.GeneralSecurityException;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.io.IOException;
 
@@ -26,6 +27,7 @@ import org.apache.http.conn.socket.ConnectionSocketFactory;
 import org.apache.http.conn.ConnectionKeepAliveStrategy;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
+import org.mozilla.gecko.sync.net.AuthHeaderProvider;
 import org.exfio.weave.Constants;
 import org.exfio.weave.client.PreconditionFailedException;
 import org.exfio.weave.net.HttpException;
@@ -46,8 +48,10 @@ public class HttpClient {
 	private static ConnectionSocketFactory sslSocketFactory = null;
 	private static CloseableHttpClient httpClient = null;
 	private static ReentrantReadWriteLock httpClientLock = null;
+	private static AuthHeaderProvider authProvider = null;
+	
 
-	private static String userAgent = "eXfio Weave/" + Constants.APP_VERSION;
+	public static String userAgent = "eXfio Weave/" + Constants.APP_VERSION;
 
 	//---------------------------------
 	// Static (initialisation) methods
@@ -72,7 +76,8 @@ public class HttpClient {
 
 		context = HttpClientContext.create();
 		
-		INSTANCE = new HttpClient();		
+		INSTANCE = new HttpClient();
+		
 	}
 
 	public static HttpClient getInstance() throws IOException {
@@ -83,7 +88,7 @@ public class HttpClient {
 	}
 
 	public static void setSSLSocketFactory(ConnectionSocketFactory factory) {
-		sslSocketFactory = factory;
+		HttpClient.sslSocketFactory = factory;
 	}
 
 	public static void setUserAgent(String userAgent) {
@@ -137,6 +142,10 @@ public class HttpClient {
 		context = clientContext;
 	}
 
+	public void setAuthHeaderProvider(AuthHeaderProvider provider) {
+		authProvider = provider;
+	}
+	
 	public void lock() {
 		httpClientLock.readLock().lock();
 	}
@@ -152,7 +161,10 @@ public class HttpClient {
 		httpClientLock.writeLock().unlock();
 	}
 
-	public CloseableHttpResponse execute(HttpUriRequest request) throws IOException {
+	public CloseableHttpResponse execute(HttpUriRequest request) throws IOException, GeneralSecurityException {
+		if ( authProvider != null ) {
+			request.addHeader(authProvider.getAuthHeader(request, null, null));
+		}		
 		return httpClient.execute(request, context);
 	}
 

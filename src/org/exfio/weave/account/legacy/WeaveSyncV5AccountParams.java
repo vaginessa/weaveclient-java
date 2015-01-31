@@ -4,10 +4,10 @@ import org.exfio.weave.account.WeaveAccountParams;
 import org.exfio.weave.client.WeaveClientFactory.ApiVersion;
 import org.exfio.weave.client.WeaveClientFactory.StorageVersion;
 
-public class FirefoxSyncLegacyParams extends WeaveAccountParams {
+public class WeaveSyncV5AccountParams extends WeaveAccountParams {
 	public String syncKey;
 
-	public FirefoxSyncLegacyParams() {
+	public WeaveSyncV5AccountParams() {
 		apiVersion     = ApiVersion.v1_1;
 		storageVersion = StorageVersion.v5;
 	}

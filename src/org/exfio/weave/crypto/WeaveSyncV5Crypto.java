@@ -30,11 +30,11 @@ import org.exfio.weave.storage.WeaveBasicObject;
 import org.exfio.weave.util.Log;
 import org.exfio.weave.util.Base64;
 
-public class WeaveCryptoV5 {
+public class WeaveSyncV5Crypto {
 	
 	public static final String KEY_CRYPTO_PATH       = "crypto/keys";
 	public static final String KEY_CRYPTO_COLLECTION = "crypto";
-	public static final String KEY_CRYPTO_ID         = "keys";
+	public static final String KEY_CRYPTO_ID         = "keys";	
 	public static final String KEY_META_PATH         = "meta/global";
 	public static final String KEY_META_COLLECTION   = "meta";
 	public static final String KEY_META_ID           = "global";
@@ -45,7 +45,7 @@ public class WeaveCryptoV5 {
 	private WeaveKeyPair privateKey;
 	private Map<String, WeaveKeyPair> bulkKeys;
 
-	public WeaveCryptoV5() {
+	public WeaveSyncV5Crypto() {
 		storageClient  = null;
 		privateKey     = null;
 		bulkKeys       = null;
@@ -102,6 +102,8 @@ public class WeaveCryptoV5 {
 	}
 
 	public boolean isInitialised() throws WeaveException {
+		Log.getInstance().debug("isInitialised()");
+		
 		//Default to true as false negative could result in reset
 		boolean meta = true;
 		boolean keys = true;

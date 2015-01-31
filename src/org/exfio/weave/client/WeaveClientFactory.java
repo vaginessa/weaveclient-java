@@ -104,6 +104,9 @@ public class WeaveClientFactory {
 		case v1_1:
 			wc = new WeaveClientV1_1();
 			break;
+		case v1_5:
+			wc = new WeaveClientV1_5();
+			break;
 		default:
 			throw new WeaveException(String.format("Weave Sync API version '%s' not recognised", apiVersion));
 		}

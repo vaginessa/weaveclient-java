@@ -13,6 +13,7 @@ package org.exfio.weave.client;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.net.URI;
 import java.util.Properties;
 
 import org.apache.commons.cli.CommandLine;
@@ -21,15 +22,17 @@ import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
-
 import org.exfio.weave.AccountNotFoundException;
 import org.exfio.weave.WeaveException;
 import org.exfio.weave.account.WeaveAccount;
 import org.exfio.weave.account.WeaveAccountCLI;
 import org.exfio.weave.account.WeaveAccountParams;
-import org.exfio.weave.account.legacy.FirefoxSyncLegacy;
-import org.exfio.weave.account.legacy.FirefoxSyncLegacyParams;
+import org.exfio.weave.account.fxa.FxAccount;
+import org.exfio.weave.account.fxa.FxAccountParams;
+import org.exfio.weave.account.legacy.WeaveSyncV5Account;
+import org.exfio.weave.account.legacy.WeaveSyncV5AccountParams;
 import org.exfio.weave.client.WeaveClient;
+import org.exfio.weave.client.WeaveClientFactory.ApiVersion;
 import org.exfio.weave.storage.NotFoundException;
 import org.exfio.weave.storage.WeaveBasicObject;
 import org.exfio.weave.storage.WeaveCollectionInfo;
@@ -50,17 +53,18 @@ public class WeaveClientCLI {
 	
 	public static void main( String[] args ) {
 		
-		String baseURL    = null;
-		String username   = null;
-		String password   = null;
-		String synckey    = null;
-		String collection = null;
-		String id         = null;
-		String payload    = null;
-		boolean delete    = false;
-		boolean info      = false;
-		boolean encrypt   = true;
-		String loglevel   = null;
+		String accountServer = null;
+		String tokenServer   = null;
+		String username      = null;
+		String password      = null;
+		String synckey       = null;
+		String collection    = null;
+		String id            = null;
+		String payload       = null;
+		boolean delete       = false;
+		boolean info         = false;
+		boolean encrypt      = true;
+		String loglevel      = null;
 		
 		WeaveClientFactory.ApiVersion apiVersion = null;
 		
@@ -75,15 +79,16 @@ public class WeaveClientCLI {
 		options.addOption("p", "password", true, "password");
 
 		//Initialise account from commandline parameters
-		options.addOption("v", "api-version", true, "api version (auto|1.1). Defaults to auto");	
-		options.addOption("s", "server", true, "server URL");
+		options.addOption("v", "api-version", true, "api version (auto|1.1|1.5). Defaults to 1.1");
+		options.addOption("s", "account-server", true, "account server URL");
+		options.addOption("t", "token-server", true, "token server URL");
 		options.addOption("u", "username", true, "username");
 		options.addOption("k", "sync-key", true, "sync key");
 		
 		//Weave sync storage request parameters
 		options.addOption("c", "collection", true, "collection");
 		options.addOption("i", "id", true, "object ID");
-		options.addOption("t", "plaintext", false, "do not encrypt/decrypt item");
+		options.addOption("", "plaintext", false, "do not encrypt/decrypt item");
 		options.addOption("m", "modify", true, "update item with given value in JSONUtils format. Requires -c and -i");
 		options.addOption("d", "delete", false, "delete item. Requires -c and -i");
 		options.addOption("n", "info", false, "get collection info. Requires -c");
@@ -124,11 +129,8 @@ public class WeaveClientCLI {
 		// OS details
 		Log.getInstance().debug(String.format("os: %s, distro: %s, hostname: %s, prettyname: %s", OSUtils.getOS(), OSUtils.getDistro(), OSUtils.getHostName(), OSUtils.getPrettyName()));
 
-		//Get password
-		password = cmd.getOptionValue('p', null);
-
-		//Get other account params
-		WeaveAccountParams clientParams = null;
+		// Intialise account
+		WeaveAccount account = null;
 		
 		if ( cmd.hasOption('f') || cmd.hasOption('a') ) {
 
@@ -169,13 +171,20 @@ public class WeaveClientCLI {
 			
 			if ( apiVersion == WeaveClientFactory.ApiVersion.v1_1 ) {
 				try {
-					WeaveAccount account = new FirefoxSyncLegacy();
+					account = new WeaveSyncV5Account();
 					account.init(clientProp, password);
-					clientParams = account.getAccountParams();
 				} catch (WeaveException e) {
 					System.err.println(String.format("Couldn't initialise Weave Sync account - %s", e.getMessage()));
 					System.exit(1);
 				}
+			} else if ( apiVersion == WeaveClientFactory.ApiVersion.v1_5 ) {
+					try {
+						account = new FxAccount();
+						account.init(clientProp, password);
+					} catch (WeaveException e) {
+						System.err.println(String.format("Couldn't initialise Weave Sync account - %s", e.getMessage()));
+						System.exit(1);
+					}
 			} else {
 				System.err.println("Storage version not recognised");
 				System.exit(1);
@@ -194,36 +203,100 @@ public class WeaveClientCLI {
 				System.exit(1);
 			}
 			
-			baseURL  = cmd.getOptionValue('s', null);
-			username = cmd.getOptionValue('u', null);
-			synckey  = cmd.getOptionValue('k', null);				
+			if (apiVersion == ApiVersion.v1_1) {
+				
+				//Get host and credential details
+				accountServer = cmd.getOptionValue('s');
+				username      = cmd.getOptionValue('u');
+				password      = cmd.getOptionValue('p');
+				synckey       = cmd.getOptionValue('k');
+				
+				if (
+					(accountServer == null || accountServer.isEmpty())
+					||
+					(username == null || username.isEmpty())
+					||
+					(password == null || password.isEmpty())
+					||
+					(synckey == null || synckey.isEmpty())
+				) {
+					System.err.println("server, username, password and synckey are required parameters for account registration");
+					System.exit(1);
+				}
+	
+				//Validate URI syntax
+				try {
+					URI.create(accountServer);
+				} catch (IllegalArgumentException e) {
+					System.err.printf("'%s' is not a valid URI, i.e. should be http(s)://example.com\n", accountServer);
+					System.exit(1);
+				}			
+	
+				WeaveSyncV5AccountParams fslParams = new WeaveSyncV5AccountParams();
+				fslParams.accountServer  = accountServer;
+				fslParams.user           = username;
+				fslParams.password       = password;
+				fslParams.syncKey        = synckey;
+				
+				try {
+					account = new WeaveSyncV5Account();
+					account.init(fslParams);
+				} catch (WeaveException e) {
+					System.err.println(String.format("Couldn't initialise account - %s", e.getMessage()));
+					System.exit(1);
+				}
 
-			if (
-				(baseURL == null || baseURL.isEmpty())
-				||
-				(username == null || username.isEmpty())
-				||
-				(password == null || password.isEmpty())
-				||
-				(synckey == null || synckey.isEmpty())
-			) {
-				System.err.println("server, username, password and synckey are required parameters");
-				System.exit(1);
-			}
+			} else if (apiVersion == ApiVersion.v1_5) {
+					
+				//Get host and credential details
+				accountServer = cmd.getOptionValue('s');
+				tokenServer   = cmd.getOptionValue('t');
+				username      = cmd.getOptionValue('u');
+				password      = cmd.getOptionValue('p');
+				
+				if (
+					(accountServer == null || accountServer.isEmpty())
+					||
+					(tokenServer == null || tokenServer.isEmpty())
+					||
+					(username == null || username.isEmpty())
+					||
+					(password == null || password.isEmpty())
+				) {
+					System.err.println("account-server, token-server, username and password are required parameters for account registration");
+					System.exit(1);
+				}
+	
+				//Validate URI syntax
+				try {
+					URI.create(accountServer);
+				} catch (IllegalArgumentException e) {
+					System.err.printf("'%s' is not a valid URI, i.e. should be http(s)://example.com\n", accountServer);
+					System.exit(1);
+				}			
+	
+				FxAccountParams fxaParams = new FxAccountParams();
+				fxaParams.accountServer  = accountServer;
+				fxaParams.tokenServer    = tokenServer;
+				fxaParams.user           = username;
+				fxaParams.password       = password;
+				
+				try {
+					account = new FxAccount();
+					account.init(fxaParams);
+				} catch (WeaveException e) {
+					System.err.println(String.format("Couldn't initialise account - %s", e.getMessage()));
+					System.exit(1);
+				}
 
-			if ( apiVersion == WeaveClientFactory.ApiVersion.v1_1 ) {
-				FirefoxSyncLegacyParams fslParams = new FirefoxSyncLegacyParams();
-				fslParams.accountServer = baseURL;
-				fslParams.user          = username;
-				fslParams.password      = password;
-				fslParams.syncKey       = synckey;
-				clientParams = fslParams;
 			} else {
-				System.err.println("Storage version not recognised");
-				System.exit(1);
-			}					
+				Log.getInstance().warn(String.format("API version %s not supported", apiVersion));
+			}				
+			
 		}
-
+		
+		WeaveAccountParams clientParams = account.getAccountParams();
+		
 		Log.getInstance().debug(String.format("Account params:\n%s", clientParams));
 		
 		//Initialise weave client from account params
