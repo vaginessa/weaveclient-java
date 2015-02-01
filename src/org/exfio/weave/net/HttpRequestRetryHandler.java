@@ -2,7 +2,7 @@ package org.exfio.weave.net;
 
 import java.util.Locale;
 
-import org.apache.commons.lang.ArrayUtils;
+import org.apache.commons.lang3.ArrayUtils;
 
 import org.apache.http.HttpRequest;
 import org.apache.http.impl.client.DefaultHttpRequestRetryHandler;

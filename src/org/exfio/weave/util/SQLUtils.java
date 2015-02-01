@@ -5,12 +5,13 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
-import org.apache.commons.lang.StringEscapeUtils;
-
 public class SQLUtils {
 	
 	public static String quote(String value) {
-		return String.format("'%s'", StringEscapeUtils.escapeSql(value));
+		if (value == null) {
+			return null;
+		}
+		return String.format("'%s'", value.replaceAll("'", "''"));
 	}
 
 	public static String quote(int id) {
@@ -26,7 +27,6 @@ public class SQLUtils {
 		}
 		return quoted;
 	}
-
 
 	public static String like(String value) {
 		return like(value, true, true);

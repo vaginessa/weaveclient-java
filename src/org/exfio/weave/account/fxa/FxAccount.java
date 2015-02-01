@@ -13,7 +13,6 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
 import org.json.simple.parser.ParseException;
-
 import org.mozilla.gecko.background.common.log.Logger;
 import org.mozilla.gecko.background.fxa.FxAccountClientException;
 import org.mozilla.gecko.background.fxa.FxAccountUtils;
@@ -24,7 +23,7 @@ import org.mozilla.gecko.sync.NonObjectJSONException;
 import org.mozilla.gecko.sync.crypto.KeyBundle;
 import org.mozilla.gecko.tokenserver.TokenServerClient;
 import org.mozilla.gecko.tokenserver.TokenServerToken;
-
+import org.apache.commons.lang3.concurrent.BasicThreadFactory;
 import org.exfio.fxa.FxAccountClient;
 import org.exfio.fxa.FxAccountKeys;
 import org.exfio.fxa.BlockingTokenServerClientDelegate;
@@ -231,7 +230,16 @@ public class FxAccount extends WeaveAccount {
 	    	throw new WeaveException("Error generating client state - " + e.getMessage());
 	    }
 	    
-		Executor executor  = Executors.newSingleThreadExecutor();
+	    //Not sure why but if ThreadFactory not used threads do not close
+		//Executor executor  = Executors.newSingleThreadExecutor();
+	    
+		BasicThreadFactory factory = new BasicThreadFactory.Builder()
+    	.namingPattern("fxaccount-%d")
+    	.daemon(true)
+    	.priority(Thread.MAX_PRIORITY)
+    	.build();
+		Executor executor  = Executors.newSingleThreadExecutor(factory);
+		
 		BlockingTokenServerClientDelegate delegate = new BlockingTokenServerClientDelegate();
 		
 	    TokenServerClient tokenServerclient = new TokenServerClient(tokenServer, executor);

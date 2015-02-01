@@ -1,7 +1,5 @@
 package org.exfio.weave.account.legacy;
 
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -16,8 +14,8 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
 import org.apache.commons.codec.binary.Base32;
-import org.apache.commons.lang.ArrayUtils;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPut;
@@ -208,7 +206,8 @@ public class WeaveSyncV5Account extends WeaveAccount {
 	}
 
 	public URI getStorageUrl() throws WeaveException {
-
+		Log.getInstance().debug("getStorageURL()");
+		
 		URI storageURL = null;
 		
 		//TODO - confirm account exists, i.e. /user/1.0/USER returns 1
@@ -220,9 +219,16 @@ public class WeaveSyncV5Account extends WeaveAccount {
 		try {
 			response = httpClient.execute(get);
 			HttpClient.checkResponse(response);
-			
-			storageURL = new URI(EntityUtils.toString(response.getEntity()));
 
+			String storageURLString = EntityUtils.toString(response.getEntity()); 
+			if ( !storageURLString.endsWith("/") ) {
+				storageURLString += "/";
+			}
+
+			Log.getInstance().debug("storage url string: " + storageURLString);
+			
+			storageURL = new URI(storageURLString);
+			
 		} catch (IOException e) {
 			throw new WeaveException(e);
 		} catch (HttpException e) {
@@ -234,6 +240,8 @@ public class WeaveSyncV5Account extends WeaveAccount {
 		} finally {
 			HttpClient.closeResponse(response);
 		}
+		
+		Log.getInstance().debug("storage url: " + storageURL.toString());
 		
 		return storageURL;
 	}

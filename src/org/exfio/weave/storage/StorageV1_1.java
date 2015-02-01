@@ -39,7 +39,7 @@ public class StorageV1_1 extends StorageContext {
 	public void init(String storageURL, String user, String password) throws WeaveException {
 		URI uriStorageURL;
 		try {
-			uriStorageURL  = new URI(String.format("%s/1.1/%s", storageURL, user));			
+			uriStorageURL  = new URI(String.format("%s/1.1/%s/", storageURL, user));			
 		} catch (URISyntaxException e) {
 			throw new WeaveException(e);
 		}

@@ -7,6 +7,8 @@ import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
+import org.apache.commons.lang3.concurrent.BasicThreadFactory;
+import org.apache.http.impl.pool.BasicConnFactory;
 import org.mozilla.gecko.background.common.log.Logger;
 import org.mozilla.gecko.background.fxa.FxAccountClient10.TwoKeys;
 import org.mozilla.gecko.background.fxa.FxAccountClient20;
@@ -38,7 +40,14 @@ public class FxAccountClient {
 	private byte[] kB;
 	
 	public FxAccountClient() {
-		executor  = Executors.newSingleThreadExecutor();
+		
+		BasicThreadFactory factory = new BasicThreadFactory.Builder()
+	    	.namingPattern("fxaclient-%d")
+	    	.daemon(true)
+	    	.priority(Thread.MAX_PRIORITY)
+	    	.build();
+		executor  = Executors.newSingleThreadExecutor(factory);
+		
 		fxaClient = null;
 		fxaSession = null;
 		
@@ -93,6 +102,12 @@ public class FxAccountClient {
 		} catch (GeneralSecurityException e) {
 			throw new FxAccountClientException("Couldn't derive client side keys - " + e.getMessage());
 		}
+	}
+	
+	public void close() {
+		fxaClient = null;
+		fxaSession = null;
+		executor = null;
 	}
 	
 	public FxAccountKeys getKeys() throws FxAccountClientException {

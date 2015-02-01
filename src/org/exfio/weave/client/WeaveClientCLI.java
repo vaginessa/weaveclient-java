@@ -14,7 +14,10 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.URI;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Properties;
+import java.util.Set;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -40,6 +43,11 @@ import org.exfio.weave.util.Log;
 import org.exfio.weave.util.OSUtils;
 
 public class WeaveClientCLI {
+
+	public static List<Thread> getThreads() {
+		Set<Thread> threadSet = Thread.getAllStackTraces().keySet();
+		return Arrays.asList(threadSet.toArray(new Thread[threadSet.size()]));
+	}
 
 	//**********************************
 	// CLI interface and helper methods
@@ -136,11 +144,6 @@ public class WeaveClientCLI {
 
 			//Get account params from local storage
 			
-			if ( password == null || password.isEmpty() ) {
-				System.err.println("password is a required parameters");
-				System.exit(1);
-			}
-
 			Properties clientProp = new Properties();
 			try {
 				File clientConfig               = null;
@@ -169,7 +172,13 @@ public class WeaveClientCLI {
 
 			apiVersion = WeaveClientFactory.stringToApiVersion(apiVersionString);
 			
-			if ( apiVersion == WeaveClientFactory.ApiVersion.v1_1 ) {
+			if ( apiVersion == WeaveClientFactory.ApiVersion.v1_1 ) {				
+				password = cmd.getOptionValue('p');
+				if ( password == null || password.isEmpty() ) {
+					System.err.println("password is a required parameters");
+					System.exit(1);
+				}
+
 				try {
 					account = new WeaveSyncV5Account();
 					account.init(clientProp, password);
@@ -178,13 +187,19 @@ public class WeaveClientCLI {
 					System.exit(1);
 				}
 			} else if ( apiVersion == WeaveClientFactory.ApiVersion.v1_5 ) {
-					try {
-						account = new FxAccount();
-						account.init(clientProp, password);
-					} catch (WeaveException e) {
-						System.err.println(String.format("Couldn't initialise Weave Sync account - %s", e.getMessage()));
-						System.exit(1);
-					}
+				password = cmd.getOptionValue('p');
+				if ( password == null || password.isEmpty() ) {
+					System.err.println("password is a required parameters");
+					System.exit(1);
+				}
+
+				try {
+					account = new FxAccount();
+					account.init(clientProp, password);
+				} catch (WeaveException e) {
+					System.err.println(String.format("Couldn't initialise Weave Sync account - %s", e.getMessage()));
+					System.exit(1);
+				}
 			} else {
 				System.err.println("Storage version not recognised");
 				System.exit(1);
@@ -413,6 +428,12 @@ public class WeaveClientCLI {
 				System.err.println(e.getMessage());
 				System.exit(1);
 			}
+			
+			//System.out.println("Threads:");
+			//List<Thread> threads = getThreads();
+			//for (Thread thread: threads) {
+			//	System.out.println(String.format("thread: %s (%s) isAlive: %s", thread.getName(), thread.getClass().getCanonicalName(), thread.isAlive()));
+			//}
 		}
 	}
 }
