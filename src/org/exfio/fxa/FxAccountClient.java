@@ -34,7 +34,6 @@ public class FxAccountClient {
 	private FxAccountClient20 fxaClient;
 	private FxAccountSession fxaSession;
 	
-	private byte[] quickStretchedPW;
 	private byte[] unwrapkB;
 	private byte[] kA;
 	private byte[] kB;
@@ -51,17 +50,16 @@ public class FxAccountClient {
 		fxaClient = null;
 		fxaSession = null;
 		
-		quickStretchedPW = null;
 		unwrapkB = null;
 		kA = null;
 		kB = null;
 	}
 	
-	public void login(String server, String username, String password) throws FxAccountClientException {
-		login(server, username, password, true);
+	public FxAccountSession login(String server, String username, String password) throws FxAccountClientException {
+		return login(server, username, password, true);
 	}	
 
-	public void login(String server, String username, String password, boolean fetchKeys) throws FxAccountClientException {
+	public FxAccountSession login(String server, String username, String password, boolean fetchKeys) throws FxAccountClientException {
 		Logger.debug(LOG_TAG, "login()");
 		
 		//Get strings as UTF8 encoded byte arrays
@@ -95,13 +93,15 @@ public class FxAccountClient {
 		fxaSession = new FxAccountSession(response);
 		
 		try {
-			quickStretchedPW = passwordStretcher.getQuickStretchedPW(fxaSession.remoteEmail.getBytes("UTF-8"));
+			byte[] quickStretchedPW = passwordStretcher.getQuickStretchedPW(fxaSession.remoteEmail.getBytes("UTF-8"));
 			unwrapkB = FxAccountUtils.generateUnwrapBKey(quickStretchedPW);
 		} catch (UnsupportedEncodingException e) {
 			throw new FxAccountClientException("Couldn't derive client side keys - " + e.getMessage());
 		} catch (GeneralSecurityException e) {
 			throw new FxAccountClientException("Couldn't derive client side keys - " + e.getMessage());
 		}
+		
+		return fxaSession;
 	}
 	
 	public void close() {
@@ -142,7 +142,7 @@ public class FxAccountClient {
 		return new FxAccountKeys(kA, kB);
 	}
 	
-	  public String signCertificate(BrowserIDKeyPair keyPair, long durationInMilliseconds) throws FxAccountClientException {
+	public String signCertificate(BrowserIDKeyPair keyPair, long durationInMilliseconds) throws FxAccountClientException {
 		Logger.debug(LOG_TAG, "signCertificate()");
 	
 		if ( fxaClient == null ) {
@@ -168,6 +168,22 @@ public class FxAccountClient {
 		//ExtendedJSONObject c = JSONWebTokenUtils.parseCertificate(certificate);
 
 		return certificate;
+	}
+	
+	public static byte[] unwrapkB(String username, String password, byte[] wrapkB) throws FxAccountClientException {
+		
+		byte[] unwrapkB = null;
+		try {
+			PasswordStretcher passwordStretcher = new QuickPasswordStretcher(password);
+			byte[] quickStretchedPW = passwordStretcher.getQuickStretchedPW(username.getBytes("UTF-8"));
+			unwrapkB = FxAccountUtils.generateUnwrapBKey(quickStretchedPW);
+		} catch (UnsupportedEncodingException e) {
+			throw new FxAccountClientException("Couldn't derive client side keys - " + e.getMessage());
+		} catch (GeneralSecurityException e) {
+			throw new FxAccountClientException("Couldn't derive client side keys - " + e.getMessage());
+		}
+
+		return FxAccountUtils.unwrapkB(unwrapkB, wrapkB);
 	}
 	
 }

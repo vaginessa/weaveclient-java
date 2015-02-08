@@ -5,7 +5,7 @@
 JAVA_BIN=java
 
 WEAVE_BINPATH=$(dirname $0)
-WEAVE_CLASSPATH="${WEAVE_BINPATH}/bin:${WEAVE_BINPATH}/libs/*:${WEAVE_BINPATH}/runtime-libs/*" 
+WEAVE_CLASSPATH="${WEAVE_BINPATH}/target/classes:${WEAVE_BINPATH}/libs/*:${WEAVE_BINPATH}/runtime-libs/*" 
 
 #echo "${JAVA_BIN} -cp $WEAVE_CLASSPATH org.exfio.weave.account.WeaveAccountCLI $@"
 "${JAVA_BIN}" -cp $WEAVE_CLASSPATH org.exfio.weave.account.WeaveAccountCLI "$@"

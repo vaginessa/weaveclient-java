@@ -12,6 +12,7 @@ import java.util.Properties;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
+import org.apache.commons.lang3.concurrent.BasicThreadFactory;
 import org.json.simple.parser.ParseException;
 import org.mozilla.gecko.background.common.log.Logger;
 import org.mozilla.gecko.background.fxa.FxAccountClientException;
@@ -19,14 +20,15 @@ import org.mozilla.gecko.background.fxa.FxAccountUtils;
 import org.mozilla.gecko.browserid.BrowserIDKeyPair;
 import org.mozilla.gecko.browserid.DSACryptoImplementation;
 import org.mozilla.gecko.browserid.JSONWebTokenUtils;
+import org.mozilla.gecko.sync.ExtendedJSONObject;
 import org.mozilla.gecko.sync.NonObjectJSONException;
 import org.mozilla.gecko.sync.crypto.KeyBundle;
 import org.mozilla.gecko.tokenserver.TokenServerClient;
 import org.mozilla.gecko.tokenserver.TokenServerToken;
-import org.apache.commons.lang3.concurrent.BasicThreadFactory;
 import org.exfio.fxa.FxAccountClient;
 import org.exfio.fxa.FxAccountKeys;
 import org.exfio.fxa.BlockingTokenServerClientDelegate;
+import org.exfio.fxa.FxAccountSession;
 import org.exfio.weave.WeaveException;
 import org.exfio.weave.account.WeaveAccount;
 import org.exfio.weave.account.WeaveAccountParams;
@@ -39,6 +41,7 @@ import org.exfio.weave.storage.StorageParams;
 import org.exfio.weave.storage.StorageV1_5;
 import org.exfio.weave.storage.StorageV1_5Params;
 import org.exfio.weave.storage.WeaveCollectionInfo;
+import org.exfio.weave.util.Base64;
 import org.exfio.weave.util.Hex;
 import org.exfio.weave.util.Log;
 
@@ -47,18 +50,26 @@ import org.exfio.weave.util.Log;
 public class FxAccount extends WeaveAccount {
 	private static final String LOG_TAG = "exfio.fxaccount";
 	
-	public static final String KEY_ACCOUNT_CONFIG_TOKENSERVER      = "tokenserver";
-	private static final int KEY_PAIR_SIZE_IN_BITS_V1 = 1024;
+	public static final String KEY_ACCOUNT_CONFIG_TOKENSERVER   = "tokenserver";
+	public static final String KEY_ACCOUNT_CONFIG_WRAPKB        = "wrapkb";
+	public static final String KEY_ACCOUNT_CONFIG_BROWSERIDCERT = "browseridcert";
+	
+	private static final int KEY_PAIR_SIZE_IN_BITS_V1         = 1024;
 
 	private URI    accountServer;
 	private URI    tokenServer;
 	private URI    storageURL;
 	private String user;
 	private String password;
-	private FxAccountKeys fxaKeys;
-	private FxAccountSyncToken syncToken;
-	private WeaveKeyPair keyPair;
 	
+	private String email;
+	private byte[] wrapkB;
+	private FxAccountCertificate browserIdCertificate;
+	
+	private byte[] kB;
+	private WeaveKeyPair keyPair;	
+	private FxAccountSyncToken syncToken;
+
 	public FxAccount() {
 		super();
 		this.version  = ApiVersion.v1_5;
@@ -67,10 +78,14 @@ public class FxAccount extends WeaveAccount {
 		this.storageURL    = null;
 		this.user          = null;
 		this.password      = null;
-		this.fxaKeys       = null;
-		this.syncToken     = null;
-		this.keyPair       = null;
+		this.email         = null;
+		this.wrapkB        = null;
+		this.browserIdCertificate = null;
 		
+		this.kB            = null;
+		this.keyPair       = null;
+		this.syncToken     = null;
+
 		/*
 		final String audience = fxAccount.getAudience();
 		final String authServerEndpoint = fxAccount.getAccountServerURI();
@@ -81,10 +96,66 @@ public class FxAccount extends WeaveAccount {
 
 	public void init(WeaveAccountParams params) throws WeaveException {
 		FxAccountParams initParams = (FxAccountParams)params;
-		this.init(initParams.accountServer, initParams.user, initParams.password, initParams.tokenServer);		
+		
+		if (
+			(initParams.email != null && !initParams.email.isEmpty())
+			&&
+			(initParams.wrapkB != null)
+			&&
+			(initParams.browserIdCertificate != null)
+		) {
+			
+			this.init(
+				initParams.accountServer,
+				initParams.user,
+				initParams.password,
+				initParams.tokenServer,
+				initParams.email,
+				initParams.wrapkB,
+				initParams.browserIdCertificate
+			);
+		} else {
+			
+			this.init(
+				initParams.accountServer,
+				initParams.user,
+				initParams.password,
+				initParams.tokenServer
+			);
+		}
 	}
-	
+
+	public void init(String accountServer, String user, String password, String tokenServer, String email, byte[] wrapkB, FxAccountCertificate browserIdCertificate) throws WeaveException {
+		initCore(accountServer, user, password, tokenServer);
+		this.email                = email;
+		this.wrapkB               = wrapkB;
+		this.browserIdCertificate = browserIdCertificate;
+		try {
+			this.kB = FxAccountClient.unwrapkB(email, password, wrapkB);
+		} catch (FxAccountClientException e) {
+			throw new WeaveException("Couldn't unwrap kB - " + e.getMessage());
+		}
+	}
+
 	public void init(String accountServer, String user, String password, String tokenServer) throws WeaveException {
+		initCore(accountServer, user, password, tokenServer);		
+		getCertificate();
+	}
+
+	private void initCore(String accountServer, String user, String password, String tokenServer) throws WeaveException {
+
+		if (
+			(accountServer == null || accountServer.isEmpty())
+			||
+			(user == null || user.isEmpty())
+			||
+			(password == null || password.isEmpty())
+			||
+			(tokenServer == null || tokenServer.isEmpty())
+		) {
+			throw new WeaveException("accountServer, tokenServer, user and password are required paramaters");
+		}
+		
 		this.user        = user;
 		this.password    = password;
 		
@@ -99,6 +170,10 @@ public class FxAccount extends WeaveAccount {
 		} catch (URISyntaxException e) {
 			throw new WeaveException(e);
 		}
+		
+		this.email                = null;
+		this.wrapkB               = null;
+		this.browserIdCertificate = null;
 	}
 
 	@Override
@@ -151,6 +226,10 @@ public class FxAccount extends WeaveAccount {
 		params.tokenServer    = this.tokenServer.toString();
 		params.user           = this.user;
 		params.password       = this.password;
+		params.email          = this.email;
+		params.wrapkB         = this.wrapkB;
+		params.browserIdCertificate = this.browserIdCertificate;
+		
 		return params;
 	}
 
@@ -191,41 +270,14 @@ public class FxAccount extends WeaveAccount {
 	}
 	
 	private FxAccountSyncToken getSyncAuthToken(String audience) throws WeaveException {
-				
-		FxAccountClient client = new FxAccountClient();
+		Log.getInstance().debug("getSyncAuthToken()");
 		
-		try {
-			client.login(accountServer.toString(), user, password, true);			
-			fxaKeys = client.getKeys();
-		} catch (FxAccountClientException e) {
-			throw new WeaveException(e);
-		}
+		String assertion = buildAssertion(browserIdCertificate.getKeyPair(), browserIdCertificate.getCertificate(), audience);
 		
-		Log.getInstance().debug(String.format("kA: %s, kB: %s", Hex.encodeHexString(fxaKeys.kA), Hex.encodeHexString(fxaKeys.kB)));
-		
-		//Generate BrowserID KeyPair
-	    BrowserIDKeyPair keyPair;
-	    try {
-	      keyPair = generateKeyPair();
-	    } catch (NoSuchAlgorithmException e) {
-	    	throw new WeaveException("Couldn't generate BrowserID keypair - " + e.getMessage());
-	    }
-
-	    long certificateDuration = 5 * 60 * 1000; //5minutes
-	    
-	    String certificate = null;
-	    try {
-	    	certificate = client.signCertificate(keyPair, certificateDuration);
-	    } catch (FxAccountClientException e) {
-	    	throw new WeaveException("Error signing BrowserID certificate - " + e.getMessage());
-	    }
-	    
-		String assertion = buildAssertion(keyPair, certificate, audience);
-
 		//derive client state
 	    String clientState = null;
 	    try {
-	    	clientState = FxAccountUtils.computeClientState(fxaKeys.kB);
+	    	clientState = FxAccountUtils.computeClientState(kB);
 	    } catch (NoSuchAlgorithmException e) {
 	    	throw new WeaveException("Error generating client state - " + e.getMessage());
 	    }
@@ -261,6 +313,43 @@ public class FxAccount extends WeaveAccount {
 		return syncToken;
 	}
 
+	private void getCertificate() throws WeaveException {
+		Log.getInstance().debug("getCertificate()");
+		
+		FxAccountClient client = new FxAccountClient();
+		FxAccountKeys fxaKeys  = null;
+		
+		try {
+			FxAccountSession fxaSession = client.login(accountServer.toString(), user, password, true);			
+			fxaKeys = client.getKeys();
+			email   = fxaSession.remoteEmail;
+			kB = fxaKeys.kB;
+		} catch (FxAccountClientException e) {
+			throw new WeaveException(e);
+		}
+		
+		Log.getInstance().debug(String.format("kA: %s, kB: %s", Hex.encodeHexString(fxaKeys.kA), Hex.encodeHexString(fxaKeys.kB)));
+		
+		//Generate BrowserID KeyPair
+	    BrowserIDKeyPair keyPair;
+	    try {
+	      keyPair = generateKeyPair();
+	    } catch (NoSuchAlgorithmException e) {
+	    	throw new WeaveException("Couldn't generate BrowserID keypair - " + e.getMessage());
+	    }
+
+	    long certificateDuration = 5 * 60 * 1000; //5minutes
+	    
+	    String certificate = null;
+	    try {
+	    	certificate = client.signCertificate(keyPair, certificateDuration);
+	    } catch (FxAccountClientException e) {
+	    	throw new WeaveException("Error signing BrowserID certificate - " + e.getMessage());
+	    }
+	    
+	    browserIdCertificate = new FxAccountCertificate(keyPair, certificate);
+	}
+	
 	private String buildAssertion(BrowserIDKeyPair keypair, String certificate, String audience) throws WeaveException {
 		return buildAssertion(keypair, certificate, audience, JSONWebTokenUtils.DEFAULT_ASSERTION_ISSUER);
 	}
@@ -341,7 +430,7 @@ public class FxAccount extends WeaveAccount {
 		Log.getInstance().debug("getStorageUrl()");
 		
 		if ( this.storageURL == null ) {
-			FxAccountSyncToken authToken = this.getSyncAuthToken(this.tokenServer.toString());
+			FxAccountSyncToken authToken = this.getSyncAuthToken();
 			
 			String storageURLString = authToken.endpoint;
 			if ( !storageURLString.endsWith("/") ) {
@@ -365,7 +454,7 @@ public class FxAccount extends WeaveAccount {
 			
 			KeyBundle keyBundle = null;
 			try {
-				keyBundle = FxAccountUtils.generateSyncKeyBundle(fxaKeys.kB);
+				keyBundle = FxAccountUtils.generateSyncKeyBundle(kB);
 			} catch (
 				InvalidKeyException
 				| NoSuchAlgorithmException
@@ -378,7 +467,7 @@ public class FxAccount extends WeaveAccount {
 			keyPair.hmacKey  = keyBundle.getHMACKey();
 			
 			Log.getInstance().info( "Successfully generated sync key and hmac key");
-			Log.getInstance().debug( String.format("kB: %s, crypt key: %s, crypt hmac: %s", Hex.encodeHexString(fxaKeys.kB), Hex.encodeHexString(keyPair.cryptKey), Hex.encodeHexString(keyPair.hmacKey)));
+			Log.getInstance().debug( String.format("kB: %s, crypt key: %s, crypt hmac: %s", Hex.encodeHexString(kB), Hex.encodeHexString(keyPair.cryptKey), Hex.encodeHexString(keyPair.hmacKey)));
 		}
 		
 		return keyPair;
@@ -389,21 +478,51 @@ public class FxAccount extends WeaveAccount {
 		FxAccountParams fslParams = (FxAccountParams)params;
 		
 		Properties prop = new Properties();
+		
+		//Core account params
 		prop.setProperty(KEY_ACCOUNT_CONFIG_APIVERSION,  WeaveClientFactory.apiVersionToString(fslParams.getApiVersion()));
-		prop.setProperty(KEY_ACCOUNT_CONFIG_SERVER,      fslParams.accountServer);
-		prop.setProperty(KEY_ACCOUNT_CONFIG_TOKENSERVER, fslParams.tokenServer);
-		prop.setProperty(KEY_ACCOUNT_CONFIG_USERNAME,    fslParams.user);
+		prop.setProperty(KEY_ACCOUNT_CONFIG_TOKENSERVER,   fslParams.tokenServer);
+		prop.setProperty(KEY_ACCOUNT_CONFIG_SERVER,        fslParams.accountServer);
+		prop.setProperty(KEY_ACCOUNT_CONFIG_USERNAME,      fslParams.user);
+
+		//Derived account params - can be generated from core params + password
+		if ( fslParams.email != null && !fslParams.email.isEmpty() ) {
+			prop.setProperty(KEY_ACCOUNT_CONFIG_EMAIL,         fslParams.email);
+		}
+		if ( fslParams.wrapkB != null && fslParams.wrapkB.length != 0 ) {
+			prop.setProperty(KEY_ACCOUNT_CONFIG_WRAPKB,        Base64.encodeBase64String(fslParams.wrapkB));
+		}
+		if ( fslParams.browserIdCertificate != null ) {
+			prop.setProperty(KEY_ACCOUNT_CONFIG_BROWSERIDCERT, fslParams.browserIdCertificate.toJSONObject().toJSONString());
+		}
 		
 		return prop;
 	}
 
 	@Override
-	public WeaveAccountParams propertiesToAccountParams(Properties prop) {
+	public WeaveAccountParams propertiesToAccountParams(Properties prop) throws WeaveException {
 		FxAccountParams fslParams = new FxAccountParams();
+
+		//Core account params
+		fslParams.accountServer        = prop.getProperty(KEY_ACCOUNT_CONFIG_SERVER);
+		fslParams.tokenServer          = prop.getProperty(KEY_ACCOUNT_CONFIG_TOKENSERVER);
+		fslParams.user                 = prop.getProperty(KEY_ACCOUNT_CONFIG_USERNAME);
 		
-		fslParams.accountServer = prop.getProperty(KEY_ACCOUNT_CONFIG_SERVER);
-		fslParams.tokenServer   = prop.getProperty(KEY_ACCOUNT_CONFIG_TOKENSERVER);
-		fslParams.user          = prop.getProperty(KEY_ACCOUNT_CONFIG_USERNAME);
+		//Derived acount params - can be generated from core params + password
+		if ( prop.containsKey(KEY_ACCOUNT_CONFIG_EMAIL) ) {
+			fslParams.email = prop.getProperty(KEY_ACCOUNT_CONFIG_EMAIL);
+		}
+		if ( prop.containsKey(KEY_ACCOUNT_CONFIG_WRAPKB) ) {
+			fslParams.wrapkB = Base64.decodeBase64(prop.getProperty(KEY_ACCOUNT_CONFIG_WRAPKB));
+		}
+		if ( prop.containsKey(KEY_ACCOUNT_CONFIG_BROWSERIDCERT) ) {
+			try {
+				ExtendedJSONObject jsonObject = ExtendedJSONObject.parseJSONObject(prop.getProperty(KEY_ACCOUNT_CONFIG_BROWSERIDCERT));
+				fslParams.browserIdCertificate = FxAccountCertificate.fromJSONObject(jsonObject);
+			} catch (NonObjectJSONException | IOException | ParseException e) {
+				throw new WeaveException("Couldn't parse BrowserID certificate and key pair - " + e.getMessage());
+			}
+		}
 		
 		return fslParams;
 	}

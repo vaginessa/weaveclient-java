@@ -209,7 +209,7 @@ public class WeaveAccountCLI {
 		//TODO - change password etc
 		
 		//Get status of account
-		options.addOption("", "status", false, "account status");
+		options.addOption(null, "status", false, "account status");
 
 		//Exfio Peer accounts only
 		options.addOption("i", "auth-init", true, "reset client authorisation. WARNING all clients will need to re-authenticate");	
@@ -455,11 +455,6 @@ public class WeaveAccountCLI {
 
 			Log.getInstance().debug(String.format("Registered client '%s' for v%s account '%s'@%s", accountName, WeaveClientFactory.apiVersionToString(wcParams.getApiVersion()), wcParams.user, wcParams.accountServer));
 			
-			//Save account and client details
-			WeaveSyncV5AccountParams clientParams = (WeaveSyncV5AccountParams)wc.getClientParams();
-			
-			Log.getInstance().debug(String.format("Storage v5 sync key: '%s'", clientParams.syncKey));
-
 			//Generate config key
 			String configKey = null;
 			try {

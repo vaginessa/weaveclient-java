@@ -56,5 +56,5 @@ public abstract class WeaveAccount {
 		return this.accountParamsToProperties(this.getAccountParams());
 	}
 
-	public abstract WeaveAccountParams propertiesToAccountParams(Properties prop);
+	public abstract WeaveAccountParams propertiesToAccountParams(Properties prop) throws WeaveException;
 }

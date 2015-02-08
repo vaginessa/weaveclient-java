@@ -9,6 +9,5 @@ public class WeaveSyncV5AccountParams extends WeaveAccountParams {
 
 	public WeaveSyncV5AccountParams() {
 		apiVersion     = ApiVersion.v1_1;
-		storageVersion = StorageVersion.v5;
 	}
 }
