@@ -264,8 +264,15 @@ public class WeaveClientCLI {
 			} else if (apiVersion == ApiVersion.v1_5) {
 					
 				//Get host and credential details
-				accountServer = cmd.getOptionValue('s');
-				tokenServer   = cmd.getOptionValue('t');
+				if ( cmd.hasOption('s') || cmd.hasOption('t') ) {
+					accountServer = cmd.getOptionValue('s');
+					tokenServer   = cmd.getOptionValue('t');
+				} else {
+					//Default to Mozilla FxA servers
+					accountServer = WeaveClientV1_5.DEFAULT_ACCOUNT_SERVER;
+					tokenServer   = WeaveClientV1_5.DEFAULT_TOKEN_SERVER;					
+				}
+				
 				username      = cmd.getOptionValue('u');
 				password      = cmd.getOptionValue('p');
 				
@@ -363,7 +370,7 @@ public class WeaveClientCLI {
 			}
 		}
 
-		if ( cmd.hasOption('t') ) {
+		if ( cmd.hasOption("plaintext") ) {
 			encrypt = false;
 		}
 

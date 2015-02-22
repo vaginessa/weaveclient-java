@@ -32,7 +32,10 @@ import org.exfio.weave.util.Log;
 import org.exfio.weave.util.OSUtils;
 
 public class WeaveClientV1_5 extends WeaveClient {
-		
+	
+	public final static String DEFAULT_ACCOUNT_SERVER = "https://api.accounts.firefox.com/v1";
+	public final static String DEFAULT_TOKEN_SERVER = "https://token.services.mozilla.com/1.0/sync/1.5";
+	
 	private WeaveAccount accountClient;
 	
 	public WeaveClientV1_5() {
