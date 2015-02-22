@@ -1,4 +1,0 @@
-#!/bin/bash
-
-#echo "mvn -q exec:java -Dexec.mainClass=org.exfio.weave.client.WeaveClientCLI -Dexec.args=$*"
-mvn -q exec:java -Dexec.mainClass=org.exfio.weave.client.WeaveClientCLI -Dexec.args="$*"
