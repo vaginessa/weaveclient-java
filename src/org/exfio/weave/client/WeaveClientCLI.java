@@ -96,7 +96,7 @@ public class WeaveClientCLI {
 		//Weave sync storage request parameters
 		options.addOption("c", "collection", true, "collection");
 		options.addOption("i", "id", true, "object ID");
-		options.addOption("", "plaintext", false, "do not encrypt/decrypt item");
+		options.addOption(null, "plaintext", false, "do not encrypt/decrypt item");
 		options.addOption("m", "modify", true, "update item with given value in JSONUtils format. Requires -c and -i");
 		options.addOption("d", "delete", false, "delete item. Requires -c and -i");
 		options.addOption("n", "info", false, "get collection info. Requires -c");
