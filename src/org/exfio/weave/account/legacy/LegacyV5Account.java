@@ -42,7 +42,7 @@ import org.exfio.weave.util.Log;
 import org.exfio.weave.util.URIUtils;
 
 //FIXME - Add support for account management
-public class WeaveSyncV5Account extends WeaveAccount {
+public class LegacyV5Account extends WeaveAccount {
 	
 	public static final String KEY_ACCOUNT_CONFIG_SYNCKEY      = "synckey";
 
@@ -52,7 +52,7 @@ public class WeaveSyncV5Account extends WeaveAccount {
 	private String syncKey;
 	private WeaveKeyPair keyPair;
 	
-	public WeaveSyncV5Account() {
+	public LegacyV5Account() {
 		super();
 		this.version  = ApiVersion.v1_1;
 		this.baseURL  = null;
@@ -63,7 +63,7 @@ public class WeaveSyncV5Account extends WeaveAccount {
 
 	@Override
 	public void init(WeaveAccountParams params) throws WeaveException {
-		WeaveSyncV5AccountParams initParams = (WeaveSyncV5AccountParams)params;
+		LegacyV5AccountParams initParams = (LegacyV5AccountParams)params;
 		this.init(initParams.accountServer, initParams.user, initParams.password, initParams.syncKey);		
 	}
 	
@@ -81,7 +81,7 @@ public class WeaveSyncV5Account extends WeaveAccount {
 
 	@Override
 	public void createAccount(WeaveAccountParams params) throws WeaveException {
-		WeaveSyncV5AccountParams regParams = (WeaveSyncV5AccountParams)params;
+		LegacyV5AccountParams regParams = (LegacyV5AccountParams)params;
 		this.createAccount(regParams.accountServer, regParams.user, regParams.password, regParams.email);
 	}
 
@@ -189,7 +189,7 @@ public class WeaveSyncV5Account extends WeaveAccount {
 	}
 	
 	public WeaveAccountParams getAccountParams() {
-		WeaveSyncV5AccountParams params = new WeaveSyncV5AccountParams();
+		LegacyV5AccountParams params = new LegacyV5AccountParams();
 		params.accountServer  = this.baseURL.toString();
 		params.user           = this.user;
 		params.password       = this.password;
@@ -306,7 +306,7 @@ public class WeaveSyncV5Account extends WeaveAccount {
 	}
 	
 	public Properties accountParamsToProperties(WeaveAccountParams params) {
-		WeaveSyncV5AccountParams fslParams = (WeaveSyncV5AccountParams)params;
+		LegacyV5AccountParams fslParams = (LegacyV5AccountParams)params;
 		
 		Properties prop = new Properties();
 		prop.setProperty(KEY_ACCOUNT_CONFIG_APIVERSION, WeaveClientFactory.apiVersionToString(fslParams.getApiVersion()));
@@ -318,7 +318,7 @@ public class WeaveSyncV5Account extends WeaveAccount {
 	}
 
 	public WeaveAccountParams propertiesToAccountParams(Properties prop) {
-		WeaveSyncV5AccountParams fslParams = new WeaveSyncV5AccountParams();
+		LegacyV5AccountParams fslParams = new LegacyV5AccountParams();
 		
 		fslParams.accountServer = prop.getProperty(KEY_ACCOUNT_CONFIG_SERVER);
 		fslParams.user          = prop.getProperty(KEY_ACCOUNT_CONFIG_USERNAME);

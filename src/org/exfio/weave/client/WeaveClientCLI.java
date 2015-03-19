@@ -32,8 +32,8 @@ import org.exfio.weave.account.WeaveAccountCLI;
 import org.exfio.weave.account.WeaveAccountParams;
 import org.exfio.weave.account.fxa.FxAccount;
 import org.exfio.weave.account.fxa.FxAccountParams;
-import org.exfio.weave.account.legacy.WeaveSyncV5Account;
-import org.exfio.weave.account.legacy.WeaveSyncV5AccountParams;
+import org.exfio.weave.account.legacy.LegacyV5Account;
+import org.exfio.weave.account.legacy.LegacyV5AccountParams;
 import org.exfio.weave.client.WeaveClient;
 import org.exfio.weave.client.WeaveClientFactory.ApiVersion;
 import org.exfio.weave.storage.NotFoundException;
@@ -180,7 +180,7 @@ public class WeaveClientCLI {
 				}
 
 				try {
-					account = new WeaveSyncV5Account();
+					account = new LegacyV5Account();
 					account.init(clientProp, password);
 				} catch (WeaveException e) {
 					System.err.println(String.format("Couldn't initialise Weave Sync account - %s", e.getMessage()));
@@ -247,14 +247,14 @@ public class WeaveClientCLI {
 					System.exit(1);
 				}			
 	
-				WeaveSyncV5AccountParams fslParams = new WeaveSyncV5AccountParams();
+				LegacyV5AccountParams fslParams = new LegacyV5AccountParams();
 				fslParams.accountServer  = accountServer;
 				fslParams.user           = username;
 				fslParams.password       = password;
 				fslParams.syncKey        = synckey;
 				
 				try {
-					account = new WeaveSyncV5Account();
+					account = new LegacyV5Account();
 					account.init(fslParams);
 				} catch (WeaveException e) {
 					System.err.println(String.format("Couldn't initialise account - %s", e.getMessage()));

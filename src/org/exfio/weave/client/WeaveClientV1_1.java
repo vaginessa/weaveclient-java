@@ -10,23 +10,20 @@
  ******************************************************************************/
 package org.exfio.weave.client;
 
-import java.util.Map;
-
 import org.json.simple.JSONObject;
 import org.json.simple.parser.ParseException;
+
 import org.exfio.weave.Constants;
 import org.exfio.weave.WeaveException;
 import org.exfio.weave.account.WeaveAccount;
 import org.exfio.weave.account.WeaveAccountParams;
-import org.exfio.weave.account.legacy.WeaveSyncV5Account;
-import org.exfio.weave.account.legacy.WeaveSyncV5AccountParams;
+import org.exfio.weave.account.legacy.LegacyV5Account;
+import org.exfio.weave.account.legacy.LegacyV5AccountParams;
 import org.exfio.weave.client.WeaveClientFactory.StorageVersion;
 import org.exfio.weave.crypto.WeaveSyncV5Crypto;
 import org.exfio.weave.storage.NotFoundException;
-import org.exfio.weave.storage.StorageContext;
 import org.exfio.weave.storage.StorageV1_1;
 import org.exfio.weave.storage.WeaveBasicObject;
-import org.exfio.weave.storage.WeaveCollectionInfo;
 import org.exfio.weave.util.Log;
 import org.exfio.weave.util.OSUtils;
 
@@ -45,7 +42,7 @@ public class WeaveClientV1_1 extends WeaveClient {
 	public void init(String baseURL, String user, String password, String syncKey) throws WeaveException {
 		
 		//Store account params
-		WeaveSyncV5AccountParams initParams = new WeaveSyncV5AccountParams();
+		LegacyV5AccountParams initParams = new LegacyV5AccountParams();
 		initParams.accountServer  = baseURL;
 		initParams.user           = user;
 		initParams.password       = password;
@@ -56,10 +53,10 @@ public class WeaveClientV1_1 extends WeaveClient {
 
 	@Override
 	public void init(WeaveAccountParams params) throws WeaveException {
-		account = (WeaveSyncV5AccountParams)params;
+		account = (LegacyV5AccountParams)params;
 
 		//Initialise account, storage and crypto clients
-		accountClient = new WeaveSyncV5Account();
+		accountClient = new LegacyV5Account();
 		accountClient.init(account);
 		storageClient = new StorageV1_1();
 		storageClient.init(accountClient);
@@ -160,7 +157,7 @@ public class WeaveClientV1_1 extends WeaveClient {
 	}
 
 	public boolean isAuthorised() {
-		WeaveSyncV5AccountParams wsParams = (WeaveSyncV5AccountParams)account;
+		LegacyV5AccountParams wsParams = (LegacyV5AccountParams)account;
 		return ( wsParams.syncKey != null && !wsParams.syncKey.isEmpty() ); 
 	}
 }

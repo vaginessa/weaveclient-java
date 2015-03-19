@@ -32,8 +32,8 @@ import org.exfio.weave.account.exfiopeer.ClientAuthRequestMessage;
 import org.exfio.weave.account.exfiopeer.comm.Message;
 import org.exfio.weave.account.fxa.FxAccountParams;
 import org.exfio.weave.account.fxa.FxAccount;
-import org.exfio.weave.account.legacy.WeaveSyncV5Account;
-import org.exfio.weave.account.legacy.WeaveSyncV5AccountParams;
+import org.exfio.weave.account.legacy.LegacyV5Account;
+import org.exfio.weave.account.legacy.LegacyV5AccountParams;
 import org.exfio.weave.client.WeaveClient;
 import org.exfio.weave.client.WeaveClientFactory;
 import org.exfio.weave.client.WeaveClientRegistrationParams;
@@ -310,14 +310,14 @@ public class WeaveAccountCLI {
 						System.exit(1);
 					}			
 		
-					WeaveSyncV5AccountParams fslParams = new WeaveSyncV5AccountParams();
+					LegacyV5AccountParams fslParams = new LegacyV5AccountParams();
 					fslParams.accountServer  = accountServer;
 					fslParams.user           = username;
 					fslParams.password       = password;
 					fslParams.syncKey        = synckey;
 					
 					try {
-						account = new WeaveSyncV5Account();
+						account = new LegacyV5Account();
 						account.init(fslParams);
 					} catch (WeaveException e) {
 						System.err.println(String.format("Couldn't initialise account - %s", e.getMessage()));
@@ -416,14 +416,14 @@ public class WeaveAccountCLI {
 			
 					Log.getInstance().info(String.format("Creating new account, user: '%s', pass: '%s'", username, password));
 							
-					WeaveAccountParams  regParams = new WeaveSyncV5AccountParams();					
+					WeaveAccountParams  regParams = new LegacyV5AccountParams();					
 					regParams.accountServer  = accountServer;
 					regParams.user           = username;
 					regParams.password       = password;
 					regParams.email          = email;
 					
 					try {
-						account = new WeaveSyncV5Account();
+						account = new LegacyV5Account();
 						account.createAccount(regParams);
 					} catch (WeaveException e) {
 						System.err.println(String.format("Couldn't create account - %s", e.getMessage()));
@@ -575,14 +575,14 @@ public class WeaveAccountCLI {
 				//Get synckey, default to null
 				synckey = clientProp.getProperty("synckey", null);
 				
-				WeaveSyncV5AccountParams fslParams = new WeaveSyncV5AccountParams();
+				LegacyV5AccountParams fslParams = new LegacyV5AccountParams();
 				fslParams.accountServer  = accountServer;
 				fslParams.user           = username;
 				fslParams.password       = password;
 				fslParams.syncKey        = synckey;
 				
 				try {
-					account = new WeaveSyncV5Account();
+					account = new LegacyV5Account();
 					account.init(fslParams);
 				} catch (WeaveException e) {
 					System.err.println(e.getMessage());
@@ -607,7 +607,7 @@ public class WeaveAccountCLI {
 			//Get synckey, default to null
 			synckey = clientProp.getProperty("synckey", null);
 			
-			WeaveSyncV5AccountParams fslParams = new WeaveSyncV5AccountParams();
+			LegacyV5AccountParams fslParams = new LegacyV5AccountParams();
 			fslParams.accountServer  = accountServer;
 			fslParams.user           = username;
 			fslParams.password       = password;

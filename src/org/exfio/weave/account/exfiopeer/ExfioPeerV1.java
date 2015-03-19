@@ -32,7 +32,7 @@ import org.exfio.weave.account.exfiopeer.comm.NoPublishedKeysException;
 import org.exfio.weave.account.exfiopeer.comm.StorageNotFoundException;
 import org.exfio.weave.account.exfiopeer.comm.Message.MessageSession;
 import org.exfio.weave.account.exfiopeer.crypto.PBKDF2;
-import org.exfio.weave.account.legacy.WeaveSyncV5AccountParams;
+import org.exfio.weave.account.legacy.LegacyV5AccountParams;
 import org.exfio.weave.client.WeaveClient;
 import org.exfio.weave.client.WeaveClientFactory;
 import org.exfio.weave.client.WeaveClientFactory.StorageVersion;
@@ -110,7 +110,7 @@ public class ExfioPeerV1 {
 	private String getWeavePassword() throws WeaveException {
 		String password = null;
 		if ( wc.getStorageVersion() == WeaveClientFactory.StorageVersion.v5 ) {
-			WeaveSyncV5AccountParams params = (WeaveSyncV5AccountParams)wc.getClientParams();
+			LegacyV5AccountParams params = (LegacyV5AccountParams)wc.getClientParams();
 			password = params.password;
 		} else {
 			throw new WeaveException(String.format("Storage version '%s' not supported", WeaveClientFactory.storageVersionToString(wc.getStorageVersion())));
@@ -226,7 +226,7 @@ public class ExfioPeerV1 {
 
 	private String getAuthorisedSyncKey() {
 		if ( wc.getStorageVersion() == StorageVersion.v5 ) {
-			return ((WeaveSyncV5AccountParams)wc.getClientParams()).syncKey;
+			return ((LegacyV5AccountParams)wc.getClientParams()).syncKey;
 		} else {
 			return null;
 		}
