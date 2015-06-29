@@ -91,9 +91,6 @@ public class ExfioPeerV1 {
 	}
 
 	private void init(WeaveClient wc, Connection db) {
-		this.wc    = wc;
-		this.comms = new Comms(wc, db);
-		
 		try {
 			authStatus = comms.getProperty(KEY_CLIENT_CONFIG_AUTHSTATUS, null);
 			authCode   = comms.getProperty(KEY_CLIENT_CONFIG_AUTHCODE, null);
@@ -103,6 +100,11 @@ public class ExfioPeerV1 {
 			throw new AssertionError(String.format("Error loading client auth properties - %s", e.getMessage()));
 		}
 
+		boolean authorised = (syncKey != null);
+		
+		this.wc    = wc;
+		this.comms = new Comms(wc, authorised, db);
+		
 		java.security.Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());
 	}
 	
@@ -229,13 +231,11 @@ public class ExfioPeerV1 {
 			return ((LegacyV5AccountParams)wc.getClientParams()).syncKey;
 		} else {
 			return null;
-		}
+		}		
 	}
 
 	private boolean isAuthorised() {
-		//FIXME - refactor ExfioPeerV1 as WeaveAccount
-		//return wc.isAuthorised();
-		return false;
+		return (getAuthorisedSyncKey() != null);
 	}
 
 	public boolean isInitialised() throws WeaveException {
@@ -245,7 +245,7 @@ public class ExfioPeerV1 {
 	public void initClientAuth(String clientName, String database) throws WeaveException {
 		Log.getInstance().debug("initClientAuth()");
 
-		if ( comms.isInitialised() && !isAuthorised() ) {
+		if ( isInitialised() && !isAuthorised() ) {
 			throw new WeaveException("Must be an authorised client to reset client auth collections");
 		}
 		

@@ -22,6 +22,7 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 
 import lombok.Getter;
+import lombok.Setter;
 
 import java.security.KeyPair;
 import java.security.SecureRandom;
@@ -34,7 +35,9 @@ import org.exfio.weave.account.exfiopeer.comm.StorageNotFoundException;
 import org.exfio.weave.account.exfiopeer.comm.Client.EphemeralKey;
 import org.exfio.weave.account.exfiopeer.comm.Message.MessageSession;
 import org.exfio.weave.account.exfiopeer.crypto.ECDH;
+import org.exfio.weave.account.legacy.LegacyV5AccountParams;
 import org.exfio.weave.client.WeaveClient;
+import org.exfio.weave.client.WeaveClientFactory.StorageVersion;
 import org.exfio.weave.storage.NotFoundException;
 import org.exfio.weave.storage.WeaveBasicObject;
 import org.exfio.weave.util.Log;
@@ -58,6 +61,8 @@ public class Comms {
 	private Connection db;
 	private CommsApiV1 commsApi;
 	
+	@Getter @Setter private boolean authorised;
+	
 	@Getter private Client clientSelf;
 	@Getter private String clientId;
 	@Getter private String clientName;
@@ -67,25 +72,30 @@ public class Comms {
 	
 	
 	public Comms(WeaveClient wc) {
+		this(wc, false);
+	}
+
+	public Comms(WeaveClient wc, boolean authorised) {
 		this.wc       = wc;
 		this.db       = null;
 		this.commsApi = new CommsApiV1(wc);
+		this.authorised = authorised;
 	}
 	
-	public Comms(WeaveClient wc, String database) {	
+	public Comms(WeaveClient wc, boolean authorised, String database) {	
 		try {
 			Connection db = getDatabaseConnection(database);
-			init(wc, db);
+			init(wc, authorised, db);
 		} catch (SQLException e) {
 			throw new AssertionError(e.getMessage());		
 		}
 	}
 
-	public Comms(WeaveClient wc, Connection db) {
-		init(wc, db);
+	public Comms(WeaveClient wc, boolean authorised, Connection db) {
+		init(wc, authorised, db);
 	}
 
-	private void init(WeaveClient wc, Connection db) {
+	private void init(WeaveClient wc, boolean authorised, Connection db) {
 		this.wc       = wc;
 		this.db       = db;
 		this.commsApi = new CommsApiV1(wc);
@@ -115,7 +125,7 @@ public class Comms {
 	public boolean isInitialised() throws WeaveException {
 		return commsApi.isInitialised();
 	}
-	
+		
 	public void initServer() throws WeaveException {
 		commsApi.initServer(PROTO_VERSION);
 	}
@@ -136,35 +146,6 @@ public class Comms {
 		return DriverManager.getConnection("jdbc:sqlite:" + database);
 	}
 
-	/**
-	 * generateAccountGuid
-	 * 
-	 * @param baseUrl
-	 * @param username
-	 * @return String
-	 * @throws WeaveException
-	 * 
-	 * Build unique account guid that is also valid filename
-	 * 
-	 */
-	public static String generateAccountGuid(String baseUrl, String username) throws WeaveException {
-
-		String baseHost = null;
-		try {
-			URI baseURL = new URI(baseUrl);
-			baseHost = baseURL.getHost();
-		} catch (URISyntaxException e) {
-			throw new WeaveException(e);
-		}
-		
-		//Random url safe string
-        SecureRandom rnd = new SecureRandom();
-        byte[] rndBin  = rnd.generateSeed(9);
-        String rndText = Base64.encodeToString(rndBin, Base64.NO_PADDING | Base64.NO_WRAP | Base64.URL_SAFE);
-
-		return String.format("%s-%s-%s", username, baseHost, rndText);
-	}
-	
 	public void initClient(String name, boolean isAuthorised, String database) throws WeaveException {
 		initClient(name, isAuthorised, database, wc.generateWeaveID());
 	}
@@ -301,9 +282,7 @@ public class Comms {
 			}
 		}
 		
-		//FIXME - refactor ExfioPeerV1 as WeaveAccount
-		//if ( wc.isAuthorised() ) {
-		if ( false ) {
+		if ( isAuthorised() ) {
 			//If client is authorised ensure CLIENT_EPHEMERAL_KEYS_NUM ephemeral keys are published			
 			
 			ECDH ecdh = new ECDH();

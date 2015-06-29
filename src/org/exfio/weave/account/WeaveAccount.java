@@ -2,11 +2,14 @@ package org.exfio.weave.account;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.URISyntaxException;
+import java.security.SecureRandom;
 import java.util.Properties;
 
 import org.exfio.weave.WeaveException;
 import org.exfio.weave.net.HttpClient;
 import org.exfio.weave.storage.StorageParams;
+import org.exfio.weave.util.Base64;
 import org.exfio.weave.client.WeaveClientFactory.ApiVersion;
 import org.exfio.weave.crypto.WeaveKeyPair;
 
@@ -50,11 +53,46 @@ public abstract class WeaveAccount {
 
 	public abstract WeaveKeyPair getMasterKeyPair() throws WeaveException;
 
-	public abstract Properties accountParamsToProperties(WeaveAccountParams params);
-
+	//Not sure this will work if calling static method 
 	public Properties accountParamsToProperties() {
 		return this.accountParamsToProperties(this.getAccountParams());
 	}
+	
+	public abstract Properties accountParamsToProperties(WeaveAccountParams params);
 
 	public abstract WeaveAccountParams propertiesToAccountParams(Properties prop) throws WeaveException;
+
+	public static String generateAccountGuid(WeaveAccountParams params) throws WeaveException {
+		return generateAccountGuid(params.accountServer, params.user);
+	}
+
+	/**
+	 * generateAccountGuid
+	 * 
+	 * @param baseUrl
+	 * @param username
+	 * @return String
+	 * @throws WeaveException
+	 * 
+	 * Build unique account guid that is also valid filename
+	 * 
+	 */
+	public static String generateAccountGuid(String baseUrl, String username) throws WeaveException {
+
+		String baseHost = null;
+		try {
+			URI baseURL = new URI(baseUrl);
+			baseHost = baseURL.getHost();
+		} catch (URISyntaxException e) {
+			throw new WeaveException(e);
+		}
+		
+		//Random url safe string
+        SecureRandom rnd = new SecureRandom();
+        byte[] rndBin  = rnd.generateSeed(9);
+        String rndText = Base64.encodeToString(rndBin, Base64.NO_PADDING | Base64.NO_WRAP | Base64.URL_SAFE);
+
+		return String.format("%s-%s-%s", username, baseHost, rndText);
+	}
+	
 }
