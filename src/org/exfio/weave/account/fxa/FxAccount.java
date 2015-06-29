@@ -14,7 +14,6 @@ import java.util.concurrent.Executors;
 
 import org.apache.commons.lang3.concurrent.BasicThreadFactory;
 import org.json.simple.parser.ParseException;
-import org.mozilla.gecko.background.common.log.Logger;
 import org.mozilla.gecko.background.fxa.FxAccountClientException;
 import org.mozilla.gecko.background.fxa.FxAccountUtils;
 import org.mozilla.gecko.browserid.BrowserIDKeyPair;
@@ -25,6 +24,7 @@ import org.mozilla.gecko.sync.NonObjectJSONException;
 import org.mozilla.gecko.sync.crypto.KeyBundle;
 import org.mozilla.gecko.tokenserver.TokenServerClient;
 import org.mozilla.gecko.tokenserver.TokenServerToken;
+
 import org.exfio.fxa.FxAccountClient;
 import org.exfio.fxa.FxAccountKeys;
 import org.exfio.fxa.BlockingTokenServerClientDelegate;
@@ -48,7 +48,6 @@ import org.exfio.weave.util.Log;
 
 //FIXME - Add support for account management
 public class FxAccount extends WeaveAccount {
-	private static final String LOG_TAG = "exfio.fxaccount";
 	
 	public static final String KEY_ACCOUNT_CONFIG_TOKENSERVER   = "tokenserver";
 	public static final String KEY_ACCOUNT_CONFIG_WRAPKB        = "wrapkb";
@@ -295,18 +294,21 @@ public class FxAccount extends WeaveAccount {
 		BlockingTokenServerClientDelegate delegate = new BlockingTokenServerClientDelegate();
 		
 	    TokenServerClient tokenServerclient = new TokenServerClient(tokenServer, executor);
+	    
+		Log.getInstance().debug("before getTokenFromBrowserIDAssertion()");
+		
 	    tokenServerclient.getTokenFromBrowserIDAssertion(assertion, true, clientState, delegate);
 		
 	    //IMPORTANT - block while async task completes
 	    TokenServerToken token = null;
-		Logger.debug(LOG_TAG, "Wait for blocking delegate");
+		Log.getInstance().debug("Wait for blocking delegate");
 	    try {
 	    	delegate.getLatch().await();
 	    	token = delegate.getToken();
 	    } catch (Exception e) {
 	    	throw new WeaveException("Error waiting for thread to complete - " + e.getMessage());
 	    }
-		Logger.debug(LOG_TAG, "Completed BlockingDecoratorRequestDelegate");
+		Log.getInstance().debug("Completed BlockingDecoratorRequestDelegate");
 
 		this.syncToken = new FxAccountSyncToken(token);
 		

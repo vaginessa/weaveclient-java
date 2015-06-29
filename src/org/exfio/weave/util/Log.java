@@ -1,6 +1,7 @@
 package org.exfio.weave.util;
 
 import org.apache.commons.logging.LogFactory;
+import org.mozilla.gecko.background.common.log.Logger;
 
 public class Log {
 
@@ -23,7 +24,10 @@ public class Log {
 		if ( level.toLowerCase().matches("debug|trace") ) {			
 			System.setProperty("org.apache.commons.logging.simplelog.log.org.apache.http.wire", "debug");
 			System.setProperty("org.apache.commons.logging.simplelog.log.org.apache.http.headers", "debug");
-		}		
+		}
+		
+		//Enable mozilla logging
+		Logger.init(level);
 	}
 
 	public static org.apache.commons.logging.Log getInstance() {
