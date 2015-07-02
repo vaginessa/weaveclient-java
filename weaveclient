@@ -1,4 +1,6 @@
 #!/bin/bash
 
-#echo "mvn -q exec:java -Dexec.mainClass=org.exfio.weave.client.WeaveClientCLI -Dexec.args=$*"
-mvn -q exec:java -Dexec.mainClass=org.exfio.weave.client.WeaveClientCLI -Dexec.args="$*"
+BINDIR="$(dirname $0)"
+
+#echo "mvn -f $BINDIR/pom.xml -q exec:java -Dexec.mainClass=org.exfio.weave.client.WeaveClientCLI -Dexec.args=$*"
+mvn -f "$BINDIR/pom.xml" -q exec:java -Dexec.mainClass=org.exfio.weave.client.WeaveClientCLI -Dexec.args="$*"
