@@ -37,6 +37,7 @@ public class FxAccountClient {
 	private byte[] unwrapkB;
 	private byte[] kA;
 	private byte[] kB;
+	private byte[] wrapkB;
 	
 	public FxAccountClient() {
 		
@@ -53,6 +54,7 @@ public class FxAccountClient {
 		unwrapkB = null;
 		kA = null;
 		kB = null;
+		wrapkB = null;
 	}
 	
 	public FxAccountSession login(String server, String username, String password) throws FxAccountClientException {
@@ -137,9 +139,10 @@ public class FxAccountClient {
 	
 	        kA = keys.kA;
 			kB = FxAccountUtils.unwrapkB(unwrapkB, keys.wrapkB);
+			wrapkB = keys.wrapkB;
 		}
 		
-		return new FxAccountKeys(kA, kB);
+		return new FxAccountKeys(kA, kB, wrapkB);
 	}
 	
 	public String signCertificate(BrowserIDKeyPair keyPair, long durationInMilliseconds) throws FxAccountClientException {

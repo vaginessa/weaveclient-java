@@ -325,7 +325,8 @@ public class FxAccount extends WeaveAccount {
 			FxAccountSession fxaSession = client.login(accountServer.toString(), user, password, true);			
 			fxaKeys = client.getKeys();
 			email   = fxaSession.remoteEmail;
-			kB = fxaKeys.kB;
+			kB      = fxaKeys.kB;
+			wrapkB  = fxaKeys.wrapkB;
 		} catch (FxAccountClientException e) {
 			throw new WeaveException(e);
 		}
