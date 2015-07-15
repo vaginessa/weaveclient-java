@@ -8,7 +8,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
 import org.apache.commons.lang3.concurrent.BasicThreadFactory;
-import org.apache.http.impl.pool.BasicConnFactory;
+
 import org.mozilla.gecko.background.common.log.Logger;
 import org.mozilla.gecko.background.fxa.FxAccountClient10.TwoKeys;
 import org.mozilla.gecko.background.fxa.FxAccountClient20;
@@ -37,7 +37,6 @@ public class FxAccountClient {
 	private byte[] unwrapkB;
 	private byte[] kA;
 	private byte[] kB;
-	private byte[] wrapkB;
 	
 	public FxAccountClient() {
 		
@@ -54,7 +53,6 @@ public class FxAccountClient {
 		unwrapkB = null;
 		kA = null;
 		kB = null;
-		wrapkB = null;
 	}
 	
 	public FxAccountSession login(String server, String username, String password) throws FxAccountClientException {
@@ -139,10 +137,9 @@ public class FxAccountClient {
 	
 	        kA = keys.kA;
 			kB = FxAccountUtils.unwrapkB(unwrapkB, keys.wrapkB);
-			wrapkB = keys.wrapkB;
 		}
 		
-		return new FxAccountKeys(kA, kB, wrapkB);
+		return new FxAccountKeys(kA, kB);
 	}
 	
 	public String signCertificate(BrowserIDKeyPair keyPair, long durationInMilliseconds) throws FxAccountClientException {

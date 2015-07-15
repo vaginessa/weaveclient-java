@@ -467,7 +467,7 @@ public class WeaveAccountCLI {
 			//Create client config
 			File clientConfig = buildAccountConfigPathForKey(configKey);
 			
-			Properties clientProp = account.accountParamsToProperties();
+			Properties clientProp = account.accountParamsToProperties(false);
 			
 			try {
 				clientProp.store(new FileOutputStream(clientConfig), "");

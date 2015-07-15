@@ -18,6 +18,7 @@ public abstract class WeaveAccount {
 	public static final String KEY_ACCOUNT_CONFIG_APIVERSION   = "apiversion";
 	public static final String KEY_ACCOUNT_CONFIG_SERVER       = "server";
 	public static final String KEY_ACCOUNT_CONFIG_USERNAME     = "username";
+	public static final String KEY_ACCOUNT_CONFIG_PASSWORD     = "password";
 	public static final String KEY_ACCOUNT_CONFIG_EMAIL        = "email";
 
 	protected HttpClient httpClient = null;
@@ -57,8 +58,14 @@ public abstract class WeaveAccount {
 	public Properties accountParamsToProperties() {
 		return this.accountParamsToProperties(this.getAccountParams());
 	}
-	
-	public abstract Properties accountParamsToProperties(WeaveAccountParams params);
+
+	public Properties accountParamsToProperties(boolean includePassword) {
+		return this.accountParamsToProperties(this.getAccountParams(), includePassword);
+	}
+
+	public Properties accountParamsToProperties(WeaveAccountParams params) { return accountParamsToProperties(params, true); }
+
+	public abstract Properties accountParamsToProperties(WeaveAccountParams params, boolean includePassword);
 
 	public abstract WeaveAccountParams propertiesToAccountParams(Properties prop) throws WeaveException;
 

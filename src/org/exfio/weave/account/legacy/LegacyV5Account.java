@@ -305,15 +305,19 @@ public class LegacyV5Account extends WeaveAccount {
 		return keyPair;
 	}
 	
-	public Properties accountParamsToProperties(WeaveAccountParams params) {
+	public Properties accountParamsToProperties(WeaveAccountParams params, boolean includePassword) {
 		LegacyV5AccountParams fslParams = (LegacyV5AccountParams)params;
 		
 		Properties prop = new Properties();
 		prop.setProperty(KEY_ACCOUNT_CONFIG_APIVERSION, WeaveClientFactory.apiVersionToString(fslParams.getApiVersion()));
 		prop.setProperty(KEY_ACCOUNT_CONFIG_SERVER,     fslParams.accountServer);
-		prop.setProperty(KEY_ACCOUNT_CONFIG_USERNAME,   fslParams.user);
+		prop.setProperty(KEY_ACCOUNT_CONFIG_USERNAME,   fslParams.user);		
 		prop.setProperty(KEY_ACCOUNT_CONFIG_SYNCKEY,    fslParams.syncKey);
-		
+
+		if (includePassword) {
+			prop.setProperty(KEY_ACCOUNT_CONFIG_PASSWORD, fslParams.password);
+		}
+
 		return prop;
 	}
 
@@ -323,6 +327,7 @@ public class LegacyV5Account extends WeaveAccount {
 		fslParams.accountServer = prop.getProperty(KEY_ACCOUNT_CONFIG_SERVER);
 		fslParams.user          = prop.getProperty(KEY_ACCOUNT_CONFIG_USERNAME);
 		fslParams.syncKey       = prop.getProperty(KEY_ACCOUNT_CONFIG_SYNCKEY);
+		fslParams.password      = prop.getProperty(KEY_ACCOUNT_CONFIG_PASSWORD, null);
 		
 		return fslParams;
 	}

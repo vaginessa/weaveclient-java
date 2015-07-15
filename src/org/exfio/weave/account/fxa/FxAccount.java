@@ -50,8 +50,8 @@ import org.exfio.weave.util.Log;
 public class FxAccount extends WeaveAccount {
 	
 	public static final String KEY_ACCOUNT_CONFIG_TOKENSERVER   = "tokenserver";
-	public static final String KEY_ACCOUNT_CONFIG_WRAPKB        = "wrapkb";
 	public static final String KEY_ACCOUNT_CONFIG_BROWSERIDCERT = "browseridcert";
+	public static final String KEY_ACCOUNT_CONFIG_KB            = "kb";
 	
 	private static final int KEY_PAIR_SIZE_IN_BITS_V1         = 1024;
 
@@ -62,7 +62,6 @@ public class FxAccount extends WeaveAccount {
 	private String password;
 	
 	private String email;
-	private byte[] wrapkB;
 	private FxAccountCertificate browserIdCertificate;
 	
 	private byte[] kB;
@@ -78,10 +77,9 @@ public class FxAccount extends WeaveAccount {
 		this.user          = null;
 		this.password      = null;
 		this.email         = null;
-		this.wrapkB        = null;
 		this.browserIdCertificate = null;
-		
 		this.kB            = null;
+		
 		this.keyPair       = null;
 		this.syncToken     = null;
 
@@ -99,9 +97,9 @@ public class FxAccount extends WeaveAccount {
 		if (
 			(initParams.email != null && !initParams.email.isEmpty())
 			&&
-			(initParams.wrapkB != null)
-			&&
 			(initParams.browserIdCertificate != null)
+			&&
+			(initParams.kB != null)
 		) {
 			
 			this.init(
@@ -110,8 +108,8 @@ public class FxAccount extends WeaveAccount {
 				initParams.password,
 				initParams.tokenServer,
 				initParams.email,
-				initParams.wrapkB,
-				initParams.browserIdCertificate
+				initParams.browserIdCertificate,
+				initParams.kB
 			);
 		} else {
 			
@@ -124,16 +122,11 @@ public class FxAccount extends WeaveAccount {
 		}
 	}
 
-	public void init(String accountServer, String user, String password, String tokenServer, String email, byte[] wrapkB, FxAccountCertificate browserIdCertificate) throws WeaveException {
-		initCore(accountServer, user, password, tokenServer);
+	public void init(String accountServer, String user, String password, String tokenServer, String email, FxAccountCertificate browserIdCertificate, byte[] kB) throws WeaveException {
+		initCore(accountServer, user, password, tokenServer, false);
 		this.email                = email;
-		this.wrapkB               = wrapkB;
 		this.browserIdCertificate = browserIdCertificate;
-		try {
-			this.kB = FxAccountClient.unwrapkB(email, password, wrapkB);
-		} catch (FxAccountClientException e) {
-			throw new WeaveException("Couldn't unwrap kB - " + e.getMessage());
-		}
+		this.kB                   = kB;
 	}
 
 	public void init(String accountServer, String user, String password, String tokenServer) throws WeaveException {
@@ -142,13 +135,17 @@ public class FxAccount extends WeaveAccount {
 	}
 
 	private void initCore(String accountServer, String user, String password, String tokenServer) throws WeaveException {
+		initCore(accountServer, user, password, tokenServer, true);
+	}
+
+	private void initCore(String accountServer, String user, String password, String tokenServer, boolean passwordRequired) throws WeaveException {
 
 		if (
 			(accountServer == null || accountServer.isEmpty())
 			||
 			(user == null || user.isEmpty())
 			||
-			(password == null || password.isEmpty())
+			(passwordRequired && (password == null || password.isEmpty()))
 			||
 			(tokenServer == null || tokenServer.isEmpty())
 		) {
@@ -171,8 +168,8 @@ public class FxAccount extends WeaveAccount {
 		}
 		
 		this.email                = null;
-		this.wrapkB               = null;
 		this.browserIdCertificate = null;
+		this.kB                   = null;
 	}
 
 	@Override
@@ -226,7 +223,7 @@ public class FxAccount extends WeaveAccount {
 		params.user           = this.user;
 		params.password       = this.password;
 		params.email          = this.email;
-		params.wrapkB         = this.wrapkB;
+		params.kB             = this.kB;
 		params.browserIdCertificate = this.browserIdCertificate;
 		
 		return params;
@@ -326,7 +323,6 @@ public class FxAccount extends WeaveAccount {
 			fxaKeys = client.getKeys();
 			email   = fxaSession.remoteEmail;
 			kB      = fxaKeys.kB;
-			wrapkB  = fxaKeys.wrapkB;
 		} catch (FxAccountClientException e) {
 			throw new WeaveException(e);
 		}
@@ -477,7 +473,7 @@ public class FxAccount extends WeaveAccount {
 	}
 	
 	@Override
-	public Properties accountParamsToProperties(WeaveAccountParams params) {
+	public Properties accountParamsToProperties(WeaveAccountParams params, boolean includePassword) {
 		FxAccountParams fslParams = (FxAccountParams)params;
 		
 		Properties prop = new Properties();
@@ -488,15 +484,19 @@ public class FxAccount extends WeaveAccount {
 		prop.setProperty(KEY_ACCOUNT_CONFIG_SERVER,        fslParams.accountServer);
 		prop.setProperty(KEY_ACCOUNT_CONFIG_USERNAME,      fslParams.user);
 
+		if (includePassword) {
+			prop.setProperty(KEY_ACCOUNT_CONFIG_PASSWORD,      fslParams.password);
+		}
+		
 		//Derived account params - can be generated from core params + password
 		if ( fslParams.email != null && !fslParams.email.isEmpty() ) {
 			prop.setProperty(KEY_ACCOUNT_CONFIG_EMAIL,         fslParams.email);
 		}
-		if ( fslParams.wrapkB != null && fslParams.wrapkB.length != 0 ) {
-			prop.setProperty(KEY_ACCOUNT_CONFIG_WRAPKB,        Base64.encodeBase64String(fslParams.wrapkB));
-		}
 		if ( fslParams.browserIdCertificate != null ) {
 			prop.setProperty(KEY_ACCOUNT_CONFIG_BROWSERIDCERT, fslParams.browserIdCertificate.toJSONObject().toJSONString());
+		}
+		if ( fslParams.kB != null && fslParams.kB.length != 0 ) {
+			prop.setProperty(KEY_ACCOUNT_CONFIG_KB, Base64.encodeBase64String(fslParams.kB));
 		}
 		
 		return prop;
@@ -510,13 +510,11 @@ public class FxAccount extends WeaveAccount {
 		fslParams.accountServer        = prop.getProperty(KEY_ACCOUNT_CONFIG_SERVER);
 		fslParams.tokenServer          = prop.getProperty(KEY_ACCOUNT_CONFIG_TOKENSERVER);
 		fslParams.user                 = prop.getProperty(KEY_ACCOUNT_CONFIG_USERNAME);
+		fslParams.password             = prop.getProperty(KEY_ACCOUNT_CONFIG_PASSWORD, null);
 		
 		//Derived acount params - can be generated from core params + password
 		if ( prop.containsKey(KEY_ACCOUNT_CONFIG_EMAIL) ) {
 			fslParams.email = prop.getProperty(KEY_ACCOUNT_CONFIG_EMAIL);
-		}
-		if ( prop.containsKey(KEY_ACCOUNT_CONFIG_WRAPKB) ) {
-			fslParams.wrapkB = Base64.decodeBase64(prop.getProperty(KEY_ACCOUNT_CONFIG_WRAPKB));
 		}
 		if ( prop.containsKey(KEY_ACCOUNT_CONFIG_BROWSERIDCERT) ) {
 			try {
@@ -525,6 +523,9 @@ public class FxAccount extends WeaveAccount {
 			} catch (NonObjectJSONException | IOException | ParseException e) {
 				throw new WeaveException("Couldn't parse BrowserID certificate and key pair - " + e.getMessage());
 			}
+		}
+		if ( prop.containsKey(KEY_ACCOUNT_CONFIG_KB) ) {
+			fslParams.kB = Base64.decodeBase64(prop.getProperty(KEY_ACCOUNT_CONFIG_KB));
 		}
 		
 		return fslParams;
