@@ -12,6 +12,7 @@ package org.exfio.weave.client;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Arrays;
@@ -138,22 +139,22 @@ public class WeaveClientCLI {
 		Log.getInstance().debug(String.format("os: %s, distro: %s, hostname: %s, prettyname: %s", OSUtils.getOS(), OSUtils.getDistro(), OSUtils.getHostName(), OSUtils.getPrettyName()));
 
 		// Intialise account
-		WeaveAccount account = null;
+		WeaveAccount account  = null;
 		
 		if ( cmd.hasOption('f') || cmd.hasOption('a') ) {
 
 			//Get account params from local storage
+			File clientConfig     = null;
+			Properties clientProp = null;
 			
-			Properties clientProp = new Properties();
-			try {
-				File clientConfig               = null;
-				
+			try {	
 				if ( cmd.hasOption('f') ) {
 					clientConfig = new File(cmd.getOptionValue('f'));
 				} else if ( cmd.hasOption('a') ) {
 					clientConfig = WeaveAccountCLI.buildAccountConfigPath(cmd.getOptionValue('a'));
 				}
 				
+				clientProp = new Properties();				
 				clientProp.load(new FileInputStream(clientConfig));
 				
 			} catch (IOException e) {
@@ -205,6 +206,19 @@ public class WeaveClientCLI {
 				System.exit(1);
 			}					
 			
+			//Update client config file, i.e. new certificate and/or token
+			
+			if ( clientConfig != null && clientConfig.canWrite() ) {
+				clientProp = account.accountParamsToProperties(false);
+				
+				try {
+					clientProp.store(new FileOutputStream(clientConfig), "");
+				} catch (IOException e) {
+					System.err.println(String.format("Couldn't write client config file '%s'", clientConfig.getAbsolutePath()));
+					//System.exit(1);
+				}
+			}
+
 		} else {
 			
 			//Get account params from command line
@@ -318,7 +332,7 @@ public class WeaveClientCLI {
 		}
 		
 		WeaveAccountParams clientParams = account.getAccountParams();
-		
+
 		Log.getInstance().debug(String.format("Account params:\n%s", clientParams));
 		
 		//Initialise weave client from account params
@@ -442,5 +456,7 @@ public class WeaveClientCLI {
 			//	System.out.println(String.format("thread: %s (%s) isAlive: %s", thread.getName(), thread.getClass().getCanonicalName(), thread.isAlive()));
 			//}
 		}
+		
+		
 	}
 }

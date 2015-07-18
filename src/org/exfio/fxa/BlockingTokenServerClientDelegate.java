@@ -20,7 +20,8 @@ public class BlockingTokenServerClientDelegate implements TokenServerClientDeleg
 
 	public TokenServerToken getToken() throws Exception {
 		if ( this.error != null ) {
-			throw new Exception(this.error);
+			//throw new Exception(this.error);
+			throw this.error;
 		}
 		return this.token;
 	}
