@@ -6,7 +6,7 @@ import lombok.Setter;
 
 import org.exfio.weave.InvalidStorageException;
 import org.exfio.weave.WeaveException;
-
+import org.exfio.weave.account.WeaveAccount;
 import org.exfio.weave.account.WeaveAccountParams;
 import org.exfio.weave.client.WeaveClient;
 import org.exfio.weave.client.WeaveClientV1_1;
@@ -76,6 +76,21 @@ public class WeaveClientFactory {
 			storageVersion = StorageVersion.v6;
 		}
 		return storageVersion;
+	}
+
+	public static final WeaveClient getInstance(WeaveAccount account) throws WeaveException, InvalidStorageException {
+		//return WeaveClient for given parameters
+		WeaveClient weaveClient = null;
+		
+		if ( account.getAccountParams().getApiVersion() == null ) {
+			//auto-discovery
+			throw new WeaveException("auto discover not implemented");
+		} else {
+			weaveClient = getInstance(account.getAccountParams().getApiVersion());
+			weaveClient.init(account);
+		}
+		
+		return weaveClient;
 	}
 
 	public static final WeaveClient getInstance(WeaveAccountParams params) throws WeaveException, InvalidStorageException {

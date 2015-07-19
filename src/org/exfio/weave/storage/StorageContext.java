@@ -42,7 +42,6 @@ import org.exfio.weave.util.Base64;
 import org.exfio.weave.util.JSONUtils;
 import org.exfio.weave.util.Log;
 import org.exfio.weave.util.URIUtils;
-import org.exfio.weave.account.WeaveAccount;
 import org.exfio.weave.client.PreconditionFailedException;
 import org.exfio.weave.client.WeaveClientFactory.ApiVersion;
 import org.json.simple.JSONArray;
@@ -64,7 +63,7 @@ public abstract class StorageContext {
 		}
 	}
 	
-	public abstract void init(WeaveAccount account) throws WeaveException;
+	public abstract void init(StorageParams storageParams) throws WeaveException;
 	
 	public ApiVersion getApiVersion() {
 		return this.version;

@@ -54,6 +54,8 @@ public abstract class WeaveAccount {
 
 	public abstract WeaveKeyPair getMasterKeyPair() throws WeaveException;
 
+	//FIXME - Use (factory?) interface to support the following (quasi-static) methods
+	
 	//Not sure this will work if calling static method 
 	public Properties accountParamsToProperties() {
 		return this.accountParamsToProperties(this.getAccountParams());

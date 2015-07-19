@@ -150,7 +150,7 @@ public class LegacyV5Account extends WeaveAccount {
 
 		//Initialise storage client with account details
 		StorageContext storageClient = new StorageV1_1();
-		storageClient.init(this);
+		storageClient.init(this.getStorageParams());
 
 		//Initialise server meta data
 		WeaveSyncV5Crypto cryptoClient = new WeaveSyncV5Crypto();
@@ -163,7 +163,7 @@ public class LegacyV5Account extends WeaveAccount {
 		try {
 			//Initialise storage client with account details
 			StorageContext storageClient = new StorageV1_1();
-			storageClient.init(this);
+			storageClient.init(this.getStorageParams());
 	
 			//Initialise server meta data
 			WeaveSyncV5Crypto cryptoClient = new WeaveSyncV5Crypto();

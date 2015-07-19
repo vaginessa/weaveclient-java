@@ -12,7 +12,6 @@ package org.exfio.weave.client;
 
 import org.json.simple.JSONObject;
 import org.json.simple.parser.ParseException;
-
 import org.exfio.weave.Constants;
 import org.exfio.weave.WeaveException;
 import org.exfio.weave.account.WeaveAccount;
@@ -34,9 +33,9 @@ public class WeaveClientV1_1 extends WeaveClient {
 	public WeaveClientV1_1() {
 		super();
 		version        = StorageVersion.v5;
-		account        = null;
+		accountParams  = null;
 		storageClient  = null;
-		accountClient      = null;
+		accountClient  = null;
 	}
 
 	public void init(String baseURL, String user, String password, String syncKey) throws WeaveException {
@@ -53,18 +52,29 @@ public class WeaveClientV1_1 extends WeaveClient {
 
 	@Override
 	public void init(WeaveAccountParams params) throws WeaveException {
-		account = (LegacyV5AccountParams)params;
+		//Initialise account
+		LegacyV5Account account = new LegacyV5Account();
+		account.init(params);
 
-		//Initialise account, storage and crypto clients
-		accountClient = new LegacyV5Account();
-		accountClient.init(account);
+		init(account);
+	}
+
+	@Override
+	public void init(WeaveAccount account) throws WeaveException {
+		accountClient = account;
+		
+		//Initialise storage and crypto clients
 		storageClient = new StorageV1_1();
-		storageClient.init(accountClient);
+		storageClient.init(accountClient.getStorageParams());
 		cryptoClient = new WeaveSyncV5Crypto();
 		cryptoClient.init(storageClient, accountClient.getMasterKeyPair());
+
+		//AccountParams can be updated when initialising storage and crypto clients
+		accountParams = accountClient.getAccountParams();
 		
 		//TODO - is this check sufficiently robust? We really don't want to do this unintentionally!
 		if ( !cryptoClient.isInitialised() ) {
+			Log.getInstance().warn("Initiaising server. Any existing data will be deleted");
 			cryptoClient.initServer();
 		}
 	}
@@ -157,7 +167,7 @@ public class WeaveClientV1_1 extends WeaveClient {
 	}
 
 	public boolean isAuthorised() {
-		LegacyV5AccountParams wsParams = (LegacyV5AccountParams)account;
+		LegacyV5AccountParams wsParams = (LegacyV5AccountParams)accountParams;
 		return ( wsParams.syncKey != null && !wsParams.syncKey.isEmpty() ); 
 	}
 }

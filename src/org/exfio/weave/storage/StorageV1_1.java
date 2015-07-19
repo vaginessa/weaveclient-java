@@ -11,9 +11,7 @@ import org.apache.http.client.protocol.HttpClientContext;
 import org.apache.http.impl.auth.BasicScheme;
 import org.apache.http.impl.client.BasicAuthCache;
 import org.apache.http.impl.client.BasicCredentialsProvider;
-
 import org.exfio.weave.WeaveException;
-import org.exfio.weave.account.WeaveAccount;
 import org.exfio.weave.client.WeaveClientFactory.ApiVersion;
 
 public class StorageV1_1 extends StorageContext {
@@ -31,8 +29,8 @@ public class StorageV1_1 extends StorageContext {
 	}
 	
 	@Override
-	public void init(WeaveAccount account) throws WeaveException {
-		StorageV1_1Params params = (StorageV1_1Params)account.getStorageParams();		
+	public void init(StorageParams storageParams) throws WeaveException {
+		StorageV1_1Params params = (StorageV1_1Params)storageParams;		
 		this.init(params.storageURL, params.user, params.password);
 	}
 	

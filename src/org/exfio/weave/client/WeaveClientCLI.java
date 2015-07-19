@@ -30,7 +30,6 @@ import org.exfio.weave.AccountNotFoundException;
 import org.exfio.weave.WeaveException;
 import org.exfio.weave.account.WeaveAccount;
 import org.exfio.weave.account.WeaveAccountCLI;
-import org.exfio.weave.account.WeaveAccountParams;
 import org.exfio.weave.account.fxa.FxAccount;
 import org.exfio.weave.account.fxa.FxAccountParams;
 import org.exfio.weave.account.legacy.LegacyV5Account;
@@ -330,16 +329,12 @@ public class WeaveClientCLI {
 			}				
 			
 		}
-		
-		WeaveAccountParams clientParams = account.getAccountParams();
-
-		Log.getInstance().debug(String.format("Account params:\n%s", clientParams));
-		
+				
 		//Initialise weave client from account params
 		WeaveClient weaveClient = null;
 		
 		try {
-			weaveClient = WeaveClientFactory.getInstance(clientParams);
+			weaveClient = WeaveClientFactory.getInstance(account);
 		} catch (WeaveException e) {
 			System.err.println(e.getMessage());
 			System.exit(1);

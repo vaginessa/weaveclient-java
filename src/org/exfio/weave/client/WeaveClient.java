@@ -13,7 +13,10 @@ package org.exfio.weave.client;
 import java.io.IOException;
 import java.util.Map;
 
+import org.json.simple.parser.ParseException;
+
 import org.exfio.weave.WeaveException;
+import org.exfio.weave.account.WeaveAccount;
 import org.exfio.weave.account.WeaveAccountParams;
 import org.exfio.weave.client.WeaveClientFactory.StorageVersion;
 import org.exfio.weave.client.WeaveClientFactory.ApiVersion;
@@ -22,16 +25,17 @@ import org.exfio.weave.storage.NotFoundException;
 import org.exfio.weave.storage.StorageContext;
 import org.exfio.weave.storage.WeaveBasicObject;
 import org.exfio.weave.storage.WeaveCollectionInfo;
-import org.json.simple.parser.ParseException;
 
 public abstract class WeaveClient {
 	
 	protected StorageVersion version = null;
-	protected WeaveAccountParams account = null;
+	protected WeaveAccountParams accountParams = null;
 	protected StorageContext storageClient = null;
 	protected WeaveSyncV5Crypto cryptoClient = null;
 	
 	public abstract void init(WeaveAccountParams params) throws WeaveException;
+
+	public abstract void init(WeaveAccount account) throws WeaveException;
 
 	public abstract void registerClient(WeaveClientRegistrationParams params) throws WeaveException;
 
@@ -45,7 +49,7 @@ public abstract class WeaveClient {
 	}
 	
 	public WeaveAccountParams getClientParams() {
-		return account;
+		return accountParams;
 	}
 
 	public boolean isInitialised() throws WeaveException {

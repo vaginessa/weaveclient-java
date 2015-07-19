@@ -5,9 +5,7 @@ import java.net.URISyntaxException;
 
 import org.mozilla.gecko.sync.net.AuthHeaderProvider;
 import org.mozilla.gecko.sync.net.HawkAuthHeaderProvider;
-
 import org.exfio.weave.WeaveException;
-import org.exfio.weave.account.WeaveAccount;
 import org.exfio.weave.util.Log;
 
 public class StorageV1_5 extends StorageContext {
@@ -22,8 +20,8 @@ public class StorageV1_5 extends StorageContext {
 	}
 
 	@Override
-	public void init(WeaveAccount account) throws WeaveException {
-		StorageV1_5Params params = (StorageV1_5Params)account.getStorageParams();
+	public void init(StorageParams storageParams) throws WeaveException {
+		StorageV1_5Params params = (StorageV1_5Params)storageParams;
 		this.init(params.storageURL, params.hawkid, params.hawkkey);
 	}
 

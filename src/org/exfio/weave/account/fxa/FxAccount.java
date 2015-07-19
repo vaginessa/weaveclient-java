@@ -204,7 +204,7 @@ public class FxAccount extends WeaveAccount {
 		try {
 			//Initialise storage client with account details
 			StorageContext storageClient = new StorageV1_5();
-			storageClient.init(this);
+			storageClient.init(this.getStorageParams());
 	
 			//Initialise server meta data
 			

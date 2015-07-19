@@ -438,21 +438,20 @@ public class WeaveAccountCLI {
 
 			}
 
-			wcParams = account.getAccountParams();
-			
 			//Register device as sync client
 			WeaveClientRegistrationParams regParams = new WeaveClientRegistrationParams();
 			regParams.clientName = accountName;
 			
 			WeaveClient wc = null;
 			try {
-				wc = WeaveClientFactory.getInstance(wcParams);
+				wc = WeaveClientFactory.getInstance(account);
 				wc.registerClient(regParams);
 			} catch (WeaveException e) {
 				System.err.println(String.format("Couldn't register client - %s", e.getMessage()));
 				System.exit(1);
 			}
 
+			wcParams = account.getAccountParams();
 			Log.getInstance().debug(String.format("Registered client '%s' for v%s account '%s'@%s", accountName, WeaveClientFactory.apiVersionToString(wcParams.getApiVersion()), wcParams.user, wcParams.accountServer));
 			
 			//Generate config key
