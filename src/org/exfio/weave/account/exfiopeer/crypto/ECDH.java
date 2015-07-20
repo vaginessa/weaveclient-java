@@ -22,39 +22,13 @@ import java.security.spec.X509EncodedKeySpec;
 import javax.crypto.KeyAgreement;
 
 import org.exfio.weave.WeaveException;
+import org.exfio.weave.crypto.JCEProvider;
 import org.exfio.weave.crypto.WeaveKeyPair;
 import org.exfio.weave.util.Base64;
 import org.exfio.weave.util.OSUtils;
 
 public class ECDH {
 
-	private static String cryptoProvider = null;
-
-	private String getCryptoProvider() {
-		if ( cryptoProvider == null ) {
-			String cryptoProviderClass = null;
-			if ( OSUtils.isAndroid() ) {
-				//On android we need to use Spongy Castle, i.e. SC
-				cryptoProvider      = "SC";
-				cryptoProviderClass = "org.spongycastle.jce.provider.BouncyCastleProvider";
-			} else {
-				cryptoProvider      = "BC";
-				cryptoProviderClass = "org.bouncycastle.jce.provider.BouncyCastleProvider";
-			}
-			try {
-				Class<?> provider = Class.forName(cryptoProviderClass);
-				Security.addProvider((Provider)provider.newInstance());
-			} catch (ClassNotFoundException e) {
-				throw new AssertionError(e);
-			} catch (IllegalAccessException e) {
-				throw new AssertionError(e);
-			} catch (InstantiationException  e) {
-				throw new AssertionError(e);				
-			}
-		}
-		return cryptoProvider;
-	}
-	
 	public KeyPair extractECDHKeyPair(String privateKey, String publicKey) throws WeaveException {
 		
 		//Extract keys from ASN.1 format
@@ -65,7 +39,7 @@ public class ECDH {
 		PublicKey publicKeyObj   = null;
 
 		try {
-			KeyFactory kf          = KeyFactory.getInstance("ECDH", getCryptoProvider());
+			KeyFactory kf          = KeyFactory.getInstance("ECDH", JCEProvider.getCryptoProvider());
 			KeySpec privateKeySpec = new PKCS8EncodedKeySpec(privateKeyBin);
 			privateKeyObj          = kf.generatePrivate(privateKeySpec);
 			KeySpec publicKeySpec  = new X509EncodedKeySpec(publicKeyBin);
@@ -87,7 +61,7 @@ public class ECDH {
 		try {
 			//IMPORTANT - secp224k1 is not known to be compromised, but is under scrutiny post revelations of NSA backdoors by Snowden
 			ECGenParameterSpec ecParamSpec = new ECGenParameterSpec("secp224k1");
-			KeyPairGenerator kpg = KeyPairGenerator.getInstance("ECDH", getCryptoProvider());
+			KeyPairGenerator kpg = KeyPairGenerator.getInstance("ECDH", JCEProvider.getCryptoProvider());
 			kpg.initialize(ecParamSpec);
 			kp = kpg.generateKeyPair();
 		} catch (NoSuchProviderException e) {
@@ -115,7 +89,7 @@ public class ECDH {
 		PublicKey keyBPublicObj   = null;
 
 		try {
-			KeyFactory kf           = KeyFactory.getInstance("ECDH", getCryptoProvider());
+			KeyFactory kf           = KeyFactory.getInstance("ECDH", JCEProvider.getCryptoProvider());
 			KeySpec keyAPrivateSpec = new PKCS8EncodedKeySpec(keyAPrivate);
 			keyAPrivateObj          = kf.generatePrivate(keyAPrivateSpec);
 			KeySpec keyBPublicSpec  = new X509EncodedKeySpec(keyBPublic);
@@ -135,7 +109,7 @@ public class ECDH {
 		
 		KeyAgreement ka = null;
 		try {
-			ka = KeyAgreement.getInstance("ECDH", getCryptoProvider());
+			ka = KeyAgreement.getInstance("ECDH", JCEProvider.getCryptoProvider());
 			ka.init(keyAPrivate);
 			ka.doPhase(keyBPublic, true);
 		} catch (NoSuchProviderException e) {

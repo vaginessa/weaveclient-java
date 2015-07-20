@@ -8,7 +8,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
 import org.apache.commons.lang3.concurrent.BasicThreadFactory;
-
+import org.exfio.weave.crypto.JCEProvider;
 import org.mozilla.gecko.background.common.log.Logger;
 import org.mozilla.gecko.background.fxa.FxAccountClient10.TwoKeys;
 import org.mozilla.gecko.background.fxa.FxAccountClient20;
@@ -18,6 +18,7 @@ import org.mozilla.gecko.background.fxa.PasswordStretcher;
 import org.mozilla.gecko.background.fxa.FxAccountClient20.LoginResponse;
 import org.mozilla.gecko.background.fxa.QuickPasswordStretcher;
 import org.mozilla.gecko.browserid.BrowserIDKeyPair;
+import org.mozilla.gecko.sync.crypto.PBKDF2;
 
 /**
  * FxAccountClient
@@ -53,6 +54,9 @@ public class FxAccountClient {
 		unwrapkB = null;
 		kA = null;
 		kB = null;
+		
+		//Use bouncy/spongy castle to generate PBKDF2, which is 10 x faster than Mozilla Java implementation 
+		PBKDF2.setCryptoProvider(JCEProvider.getCryptoProvider());
 	}
 	
 	public FxAccountSession login(String server, String username, String password) throws FxAccountClientException {
