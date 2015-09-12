@@ -14,8 +14,10 @@
 package org.exfio.weave.net;
 
 import java.security.GeneralSecurityException;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.io.IOException;
+
+import lombok.Getter;
+import lombok.Setter;
 
 import org.apache.http.HttpResponse;
 import org.apache.http.HttpStatus;
@@ -23,8 +25,6 @@ import org.apache.http.StatusLine;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpUriRequest; 
 import org.apache.http.client.protocol.HttpClientContext;
-import org.apache.http.conn.socket.ConnectionSocketFactory;
-import org.apache.http.conn.ConnectionKeepAliveStrategy;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.mozilla.gecko.sync.net.AuthHeaderProvider;
@@ -35,70 +35,31 @@ import org.exfio.weave.net.HttpRequestRetryHandler;
 import org.exfio.weave.storage.NotFoundException;
 import org.exfio.weave.util.Log;
 
-
-
 public class HttpClient {
 
-	private static HttpClient INSTANCE = null;
+	public final static String DEFAULT_USER_AGENT = "eXfio Weave/" + Constants.APP_VERSION;
 	
-	private static HttpClientContext context = null;
-	@SuppressWarnings("unused")
-	private static ConnectionKeepAliveStrategy keepAlive;
-	@SuppressWarnings("unused")
-	private static ConnectionSocketFactory sslSocketFactory = null;
-	private static CloseableHttpClient httpClient = null;
-	private static ReentrantReadWriteLock httpClientLock = null;
-	private static AuthHeaderProvider authProvider = null;
+	private CloseableHttpClient httpClient = null;
 	
+	@Getter private String userAgent = null;
+	@Setter private HttpClientContext context = null;
+	@Setter private AuthHeaderProvider authHeaderProvider = null;
 
-	public static String userAgent = "eXfio Weave/" + Constants.APP_VERSION;
-
-	//---------------------------------
-	// Static (initialisation) methods
-	//---------------------------------
-	
 	//Initialise httpClient
-	public static void init() throws IOException {
-
-		if ( httpClient != null ) {
-			httpClientLock.writeLock().lock();
-			httpClient.close();
-			httpClient = null;
-			httpClientLock.writeLock().unlock();
-		}
-
-		httpClient = HttpClients.custom()
-				.setRetryHandler(HttpRequestRetryHandler.INSTANCE)
-				.setUserAgent(userAgent)
-				.build();
-		
-		httpClientLock = new ReentrantReadWriteLock();
-
-		context = HttpClientContext.create();
-		
-		INSTANCE = new HttpClient();
-		
+	public HttpClient() {
+		this(DEFAULT_USER_AGENT);
 	}
-
-	public static HttpClient getInstance() throws IOException {
-		if ( INSTANCE == null || httpClient == null) {
-			init();
-		}
-		return INSTANCE;
-	}
-
-	public static void setSSLSocketFactory(ConnectionSocketFactory factory) {
-		HttpClient.sslSocketFactory = factory;
-	}
-
-	public static void setUserAgent(String userAgent) {
-		HttpClient.userAgent = userAgent;
-	}
-
 	
-	//---------------------------------
-	// Static (helper) methods
-	//---------------------------------
+	public HttpClient(String userAgent) {
+
+		this.userAgent = userAgent;
+		this.context = HttpClientContext.create();
+		
+		httpClient = HttpClients.custom()
+			.setRetryHandler(HttpRequestRetryHandler.INSTANCE)
+			.setUserAgent(userAgent)
+			.build();
+	}
 
 	public static void closeResponse(CloseableHttpResponse response) {
 		if ( response == null ) {
@@ -134,38 +95,17 @@ public class HttpClient {
 		}
 	}
 	
-	//---------------------------------
-	// Instance (post-initialisation) methods
-	//---------------------------------
-
-	public void setContext(HttpClientContext clientContext) {
-		context = clientContext;
-	}
-
-	public void setAuthHeaderProvider(AuthHeaderProvider provider) {
-		authProvider = provider;
-	}
-	
-	public void lock() {
-		httpClientLock.readLock().lock();
-	}
-	
-	public void unlock() {
-		httpClientLock.readLock().unlock();
+	public CloseableHttpResponse execute(HttpUriRequest request) throws IOException, GeneralSecurityException {
+		if ( authHeaderProvider != null ) {
+			request.addHeader(authHeaderProvider.getAuthHeader(request, null, null));
+		}		
+		return httpClient.execute(request, context);
 	}
 	
 	public void close() throws IOException {
-		httpClientLock.writeLock().lock();
-		httpClient.close();
-		httpClient = null;
-		httpClientLock.writeLock().unlock();
-	}
-
-	public CloseableHttpResponse execute(HttpUriRequest request) throws IOException, GeneralSecurityException {
-		if ( authProvider != null ) {
-			request.addHeader(authProvider.getAuthHeader(request, null, null));
-		}		
-		return httpClient.execute(request, context);
+		if ( httpClient != null ) {
+			httpClient.close();
+		}
 	}
 
 }

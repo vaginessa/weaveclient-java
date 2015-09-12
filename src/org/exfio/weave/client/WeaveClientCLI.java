@@ -71,6 +71,7 @@ public class WeaveClientCLI {
 		String payload       = null;
 		boolean delete       = false;
 		boolean info         = false;
+		boolean ids          = false;
 		boolean encrypt      = true;
 		String loglevel      = null;
 		
@@ -100,6 +101,7 @@ public class WeaveClientCLI {
 		options.addOption("m", "modify", true, "update item with given value in JSONUtils format. Requires -c and -i");
 		options.addOption("d", "delete", false, "delete item. Requires -c and -i");
 		options.addOption("n", "info", false, "get collection info. Requires -c");
+		options.addOption("o", "ids", false, "get collection ids. Requires -c");
 		
 		options.addOption("l", "log-level", true, "set log level (trace|debug|info|warn|error)");
 		
@@ -379,6 +381,14 @@ public class WeaveClientCLI {
 			}
 		}
 
+		if ( cmd.hasOption('o') ) {
+			if ( !( id == null && payload == null ) ) {
+				//quietly do nothing
+			} else {
+				ids = true;
+			}
+		}
+
 		if ( cmd.hasOption("plaintext") ) {
 			encrypt = false;
 		}
@@ -424,6 +434,20 @@ public class WeaveClientCLI {
 			}
 
 			System.out.println(colinfo.toString());
+
+		} else if ( ids ) {
+			try {
+				String[] colIds = weaveClient.getCollectionIds(collection, null, null, null, null, null, null, null, null);
+				for (String colId: colIds) {
+					System.out.println(colId);
+				}
+			} catch(WeaveException e) {
+				System.err.println(e.getMessage());
+				System.exit(1);
+			} catch(NotFoundException e) {
+				System.err.println(e.getMessage());
+				System.exit(1);
+			}
 
 		} else {
 			

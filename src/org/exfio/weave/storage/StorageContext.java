@@ -56,11 +56,7 @@ public abstract class StorageContext {
 	protected URI storageURL;
 	
 	public StorageContext() throws WeaveException {
-		try {
-			httpClient = HttpClient.getInstance();
-		} catch (IOException e) {
-			throw new WeaveException(e);
-		}
+		httpClient = new HttpClient();
 	}
 	
 	public abstract void init(StorageParams storageParams) throws WeaveException;
@@ -281,7 +277,9 @@ public abstract class StorageContext {
 			
 			//Use URIBuilder to encode query string parameters. java.util.URI DOES NOT correctly handle commas
 			URIBuilder uri = new URIBuilder(location);
-			uri.setParameters(params);
+			if (params.size() > 0) {
+				uri.setParameters(params);
+			}
 			location = new URI(uri.toString());
 		} catch (URISyntaxException e) {
 			throw new WeaveException(e);
@@ -373,6 +371,25 @@ public abstract class StorageContext {
 		return jobj.toJSONString();
 	}
 
+	private Double parseModifiedResponse(String response) throws WeaveException {
+		
+		//Assume that modified response is JSON encoded
+		JSONParser parser = new JSONParser();
+		JSONObject jsonObject = null;
+		try {
+			jsonObject = (JSONObject)parser.parse(response);
+			if ( !jsonObject.containsKey("modified") ) {
+				throw new WeaveException("Invalid modified response");
+			}			
+			return JSONUtils.toDouble(jsonObject.get("modified"));
+			
+		} catch (ParseException | ClassCastException e) {
+			
+			//Okay that didn't work how about plain text
+			return Double.parseDouble(response);
+		}
+	}
+	
 	public Double put(String collection, String id, WeaveBasicObject wbo) throws WeaveException {
 		URI location = this.storageURL.resolve(URIUtils.sanitize(String.format("storage/%s/%s", collection, id)));
 		return put(location, wbo);
@@ -403,7 +420,7 @@ public abstract class StorageContext {
 			checkResponse(response);
 
 			//parse request content to extract server modified time
-			modified = Double.parseDouble(EntityUtils.toString(response.getEntity()));
+			modified = parseModifiedResponse(EntityUtils.toString(response.getEntity()));			
 
 		} catch (IOException e) {
 			throw new WeaveException(e);
@@ -446,7 +463,7 @@ public abstract class StorageContext {
 			response = httpClient.execute(del);
 			checkResponse(response);
 			
-			modified = Double.parseDouble(EntityUtils.toString(response.getEntity()));
+			modified = parseModifiedResponse(EntityUtils.toString(response.getEntity()));
 
 		} catch (IOException e) {
 			throw new WeaveException(e);
@@ -500,14 +517,6 @@ public abstract class StorageContext {
 		}
 	}
 
-	public void lock() {
-		httpClient.lock();
-	}
-	
-	public void unlock() {
-		httpClient.unlock();
-	}
-	
 	public void close() throws IOException {
 		httpClient.close();
 	}

@@ -143,14 +143,6 @@ public abstract class WeaveClient {
 		return getCollection(collection, ids, older, newer, index_above, index_below, limit, offset, sort, format, true);
 	}
 
-	public void lock() {
-		getApiClient().lock();
-	}
-	
-	public void unlock() {
-		getApiClient().unlock();
-	}
-	
 	public void close() throws IOException {
 		getApiClient().close();
 	}

@@ -58,6 +58,6 @@ public class BlockingTokenServerClientDelegate implements TokenServerClientDeleg
 
 	@Override
 	public String getUserAgent() {
-		return org.exfio.weave.net.HttpClient.userAgent;
+		return org.exfio.weave.net.HttpClient.DEFAULT_USER_AGENT;
 	}
 }

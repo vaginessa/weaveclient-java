@@ -25,11 +25,7 @@ public abstract class WeaveAccount {
 	protected ApiVersion version    = null;
 	
 	public WeaveAccount() {
-		try {
-			httpClient = HttpClient.getInstance();
-		} catch (IOException e) {
-			throw new AssertionError(e);
-		}
+		httpClient = new HttpClient();
 	}
 
 	public abstract void init(WeaveAccountParams params) throws WeaveException;

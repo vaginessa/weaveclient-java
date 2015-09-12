@@ -3,7 +3,7 @@
   
   <groupId>org.exfio</groupId>
   <artifactId>weaveclient</artifactId>
-  <version>1.0.0-alpha-2</version>
+  <version>1.0.0-alpha-3</version>
   <packaging>jar</packaging>
     
   <name>WeaveClient</name>
